@@ -758,6 +758,24 @@ gateway and backend behavior with no new wire elements.
 10. **NFS4ERR_GRACE without a visible restart** (Section 6).
     Unverified that NFSv4 gateway clients tolerate it from a
     gateway they did not see restart.
+11. **The reclaim cap across repeated restarts** (D3, D10).  D3
+    measures the cap from confirmation, and D10 lets retained
+    state accumulate across instances.  Nothing says which
+    confirmation starts the clock for the remainder left by
+    instance 1 once instance 3 is confirmed.  If every
+    confirmation restarts it, a gateway that crashes in a loop
+    blocks direct clients without bound, the outcome D3 rejected
+    when it refused to pause the cap.  Candidate rule: each
+    piece of retained state keeps the clock started by the first
+    confirmation after it was retained.  Section 4 also has no
+    worked sequence for a second restart.
+12. **NFS4ERR_RECLAIM_CONFLICT** (D5).  The outline lists it and
+    no decision here uses it.  D5 answers a failed reclaim with
+    NFS4ERR_RECLAIM_BAD or NFS4ERR_NO_GRACE.  The one case it
+    might fit is state kept past a limit and then revoked for a
+    conflicting request (D3), but returning it there requires
+    the backend to remember what it revoked.  Either give it
+    that use or drop it from the outline.
 
 ## 8. Where This Lands in the Outline
 

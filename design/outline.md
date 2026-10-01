@@ -189,7 +189,7 @@ Short; refers to the problem statement for the full analysis.
 
 - NFS4ERR_RECLAIM_BAD: no retained state matches.
 - NFS4ERR_NO_GRACE: nothing is retained any longer.
-- NFS4ERR_RECLAIM_CONFLICT.
+- NFS4ERR_RECLAIM_CONFLICT: use not yet decided (Section 12).
 - No new error codes expected.
 
 ### 6.8. Interaction with the Server's Grace Period
@@ -350,6 +350,9 @@ From `design.md`, Section 7.
   mode that clients cannot detect is acceptable (D12).
 - Whether NFSv4 gateway clients tolerate NFS4ERR_GRACE from a
   gateway they did not see restart.
+- Which confirmation starts the reclaim cap when retained state
+  accumulates across repeated restarts (D3, D10).
+- Whether NFS4ERR_RECLAIM_CONFLICT has a use (Section 6.7).
 
 ## References
 
