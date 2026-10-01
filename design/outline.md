@@ -85,11 +85,19 @@ Short; refers to the problem statement for the full analysis.
 
 ## 6. Protocol Extension
 
-- Kind of extension: two new EXCHANGE_ID flag bits (an XDR
-  extension, RFC 8178 Section 4) and behavioral changes to
-  existing operations (RFC 8178 Section 5.2).  The flags are not
-  the whole extension.
-- Behavior changed, in each case only for a client ID
+- Kind of extension: two previously unassigned bits in the
+  EXCHANGE_ID flag word, an XDR extension that RFC 8178 Section
+  4.2 allows within a minor version.
+- The flags are not the whole extension.  Negotiating them
+  changes how later operations behave for that client ID.  The
+  draft has to present every such behavior as the defined
+  meaning of the new flag bits, because RFC 8178 Section 5 says
+  changes outside the XDR extension framework, behavioral
+  changes among them (Section 5.2), "can only be made in a new
+  minor version".  Precedent for flag bits that alter an
+  existing operation, published as an NFSv4.2 extension: the
+  OPEN share_access flags of RFC 9754.
+- Behavior the flags select, in each case only for a client ID
   established with the echoed flag:
   - EXCHANGE_ID and CREATE_SESSION, client restart case: state
     of the prior instance is retained, not released.
@@ -102,11 +110,21 @@ Short; refers to the problem statement for the full analysis.
   - Non-reclaim OPEN is accepted before RECLAIM_COMPLETE (RFC
     8881 Sections 18.51.3 and 8.4.2.1).
   - RECLAIM_COMPLETE releases unreclaimed retained state.
-- Compatibility argument (RFC 8178 Sections 5 and 6): a client
-  that does not set the flag, and a server that does not echo
-  it, see RFC 8881 behavior unchanged.  Clients other than the
-  retaining client see only errors they can already receive
-  (NFS4ERR_DENIED, NFS4ERR_SHARE_DENIED), for longer.
+- Compatibility argument:
+  - A client that does not set the flag, and a server that does
+    not echo it, see RFC 8881 behavior unchanged.
+  - A server sets either flag in a result only when the request
+    set RETAIN_STATE, so it knows the client is aware of the
+    extension before it sends an extended response (RFC 8178
+    Section 6).
+  - A server without the extension answers NFS4ERR_INVAL, which
+    is how a requester learns a flag bit is unknown (RFC 8178
+    Sections 4.4.3 and 8.2).
+  - Clients other than the retaining client see only errors they
+    can already receive (NFS4ERR_DENIED, NFS4ERR_SHARE_DENIED),
+    for longer.
+- No "Updates" header for RFC 8881 is needed (RFC 8178 Section
+  6).
 
 ### 6.1. Capability Negotiation (D1, D11)
 
@@ -118,6 +136,8 @@ Short; refers to the problem statement for the full analysis.
   for a server in grace that has the client owner on record.
 - The hint precedes confirmation; the result of each reclaim is
   authoritative.
+- Both result flags are set only in reply to a request that set
+  EXCHGID4_FLAG_RETAIN_STATE.
 - Server policy: which principals may be retaining clients.  A
   server that declines clears the flag in the result and behaves
   per RFC 8881.
@@ -175,10 +195,10 @@ Short; refers to the problem statement for the full analysis.
   RECLAIM_COMPLETE and is checked against retained state.
 - Non-reclaim LOCK before RECLAIM_COMPLETE: NFS4ERR_GRACE, as in
   RFC 8881.
-- An explicit update to RFC 8881 Sections 18.51.3 and 8.4.2.1,
-  in effect only for a retaining client.  Not an instance of the
-  Section 8.4.2.1 exception, though the safety argument is the
-  same.
+- Stated explicitly as a meaning of the negotiated flag that
+  differs from RFC 8881 Sections 18.51.3 and 8.4.2.1, in effect
+  only for a retaining client.  Not an instance of the Section
+  8.4.2.1 exception, though the safety argument is the same.
 
 ### 6.6. Completing Reclaim
 
@@ -355,10 +375,12 @@ From `design.md`, Section 7.
   mode that clients cannot detect is acceptable (D12).
 - Whether NFSv4 gateway clients tolerate NFS4ERR_GRACE from a
   gateway they did not see restart.
+- Whether the behavior the flags select can be an extension
+  under RFC 8178, or needs a new minor version (Section 6).
 
 ## References
 
 - Normative: RFC 8881, RFC 7862, RFC 7863, RFC 8178.
 - Informative: RFC 1813, NLM/NSM (Open Group XNFS), RFC 7530,
   the problem statement document,
-  draft-haynes-nfsv4-flexfiles-v2-proxy-server.
+  draft-haynes-nfsv4-flexfiles-v2-proxy-server, RFC 9754.

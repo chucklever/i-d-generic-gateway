@@ -132,6 +132,12 @@ These are the rules the extension changes or builds on.
   The name says what the client can do, not why, because the
   client acts the same way in all three cases (D8).
 
+The server sets either flag in `eir_flags` only when the request
+set `RETAIN_STATE`.  RFC 8178 Section 6 allows an extension to
+change the response to an existing operation only if the server
+can determine "that it is aware of the existence of XDR changes"
+before it responds, and the request flag is that evidence.
+
 Why: a server without the extension returns NFS4ERR_INVAL, which
 is an unambiguous signal, and the gateway retries without the
 flag.  The flag is recorded with the client record, so the
@@ -326,10 +332,12 @@ permits non-reclaim OPEN before RECLAIM_COMPLETE and checks it
 against retained state like any other conflict.  Non-reclaim
 LOCK before RECLAIM_COMPLETE still fails with NFS4ERR_GRACE.
 
-This is an update to Section 18.51.3 and to the matching
-statement in Section 8.4.2.1, in effect only for a client ID
-established with `RETAIN_STATE`.  RFC 8881 does not already
-permit it.  The Section 8.4.2.1 exception covers a server in its
+This differs from Section 18.51.3 and from the matching
+statement in Section 8.4.2.1.  RFC 8881 does not already permit
+it.  The draft defines it as part of what `RETAIN_STATE` means,
+in effect only for a client ID established with that flag, and
+not as a change to RFC 8881 for all clients (Section 7, item
+11).  The Section 8.4.2.1 exception covers a server in its
 own grace period; here the server is not in grace.  The safety
 argument is the same one, though: the backend holds the complete
 retained state, so it can determine that a grant cannot conflict
@@ -814,6 +822,20 @@ gateway and backend behavior with no new wire elements.
 10. **NFS4ERR_GRACE without a visible restart** (Section 6).
     Unverified that NFSv4 gateway clients tolerate it from a
     gateway they did not see restart.
+11. **Extension or new minor version.**  RFC 8178 Section 4.2
+    lets an extension add bits to a flag word.  Section 5 says
+    changes outside the XDR extension framework, including the
+    behavioral changes of Section 5.2, "can only be made in a
+    new minor version".  This design adds two flag bits and
+    attaches to them different behavior for lease expiry, client
+    restart, reclaim outside grace, the RECLAIM_COMPLETE gate,
+    and a stable-storage record.  The draft's position is that
+    all of it is the defined meaning of the new bits.  RFC 9754
+    is precedent for new flag bits that alter an existing
+    operation within NFSv4.2, but its bits are in OPEN and
+    change OPEN.  Here bits in EXCHANGE_ID change operations
+    whose own XDR is untouched.  The working group may read that
+    as a Section 5 change.  D6 is the most exposed part.
 
 ## 8. Where This Lands in the Outline
 
