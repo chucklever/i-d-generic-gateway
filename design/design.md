@@ -39,10 +39,12 @@ clients ("derived state").
    front-side grace period ends.  The backend releases whatever
    retained state was not reclaimed.
 
-The backend bounds only one interval: how long it holds state for
-a gateway that has not come back (the "absence limit").  Once the
-new instance has a session, its lease renewals keep the remaining
-retained state alive until RECLAIM_COMPLETE.
+The backend bounds two intervals: how long retained state blocks
+other clients for a gateway that has not come back (the "absence
+limit"), and how long the unreclaimed remainder blocks them once
+a new instance has a session (the "reclaim cap").  Within the
+cap, the new instance's lease renewals keep the remainder in
+place until RECLAIM_COMPLETE.
 
 The mechanism is not specific to gateways.  Any NFSv4.2 client
 that can reconstruct its lock state after a restart could use it
@@ -70,7 +72,7 @@ These are the rules the extension changes or builds on.
   expired client's locks, but they "do not prevent such a
   conflicting lock from being granted" and MUST be revoked on
   conflict (Section 8.4.3).  The extension overrides this for
-  retaining clients, up to the absence limit.
+  retaining clients, up to a limit (D3).
 - **Reclaim outside grace is refused.**  After a partition the
   server "will not allow the client to reclaim locks, because the
   server will not be in its recovery grace period" (Section
@@ -81,9 +83,16 @@ These are the rules the extension changes or builds on.
   with NFS4ERR_GRACE.  It can be sent once per server instance
   (Section 18.51.3, 18.51.4).
 - **Non-reclaim requests during grace can be allowed.**  The
-  server may grant them when it "can reliably determine ... that
+  server may grant them when it "can reliably determine (through
+  state persistently maintained across restart instances) that
   granting any such lock cannot possibly conflict with a
-  subsequent reclaim" (Section 8.4.2.1).
+  subsequent reclaim" (Section 8.4.2.1).  The exception applies
+  to a server in its own grace period.  It does not lift the
+  RECLAIM_COMPLETE gate above.
+- **A lock belongs to an open.**  A byte-range lock is
+  "associated with a lock-owner and an open-owner, the latter
+  being the open-owner associated with the open file under which
+  the LOCK operation was done" (Section 9.1.1).
 - **Unknown EXCHANGE_ID flags are rejected.**  "Bits not defined
   above cannot be set in the eia_flags field.  If they are, the
   server MUST reject the operation with NFS4ERR_INVAL" (Section
@@ -100,9 +109,20 @@ These are the rules the extension changes or builds on.
 - `EXCHGID4_FLAG_RETAIN_STATE`: set by the client to request
   retention for this client owner.  Set by the server in
   `eir_flags` when it will retain.
-- `EXCHGID4_FLAG_STATE_RETAINED_R`: result only.  Set when the
-  server currently holds retained state from a prior instance of
-  this client owner.
+- `EXCHGID4_FLAG_RECLAIMABLE_R`: result only.  Set when
+  reclaim-type requests from this client owner can succeed once
+  the new client ID is confirmed.  That is so in three cases:
+  - the server holds retained state from a prior instance whose
+    lease expired;
+  - the server holds state of a prior instance whose lease has
+    not expired, and will retain it when CREATE_SESSION confirms
+    the new instance (Section 18.35.4 replaces the old record at
+    that step, not at EXCHANGE_ID);
+  - the server is in its own grace period and its stable storage
+    lists this client owner as permitted to reclaim.
+
+  The name says what the client can do, not why, because the
+  client acts the same way in all three cases (D8).
 
 Why: a server without the extension returns NFS4ERR_INVAL, which
 is an unambiguous signal, and the gateway retries without the
@@ -110,9 +130,11 @@ flag.  The flag is recorded with the client record, so the
 server knows at lease expiry how to treat the state.  No new
 operation is needed.
 
-`STATE_RETAINED_R` is a hint.  The authoritative answer is the
-result of each reclaim.  The gateway uses the hint to decide what
-to tell its clients (D8).
+`RECLAIMABLE_R` is a hint, and it is given before
+confirmation, so it is not proof that anything was retained.
+The authoritative answer is the result of each reclaim.  The
+gateway uses the hint to decide whether to run a front-side
+grace period at all (D8).
 
 Rejected: a new operation.  It would carry more (for example the
 absence limit) but adds an operation number and XDR for
@@ -124,41 +146,81 @@ information the gateway does not need in advance (D3).
 
 - Retained: opens, with the share access and deny modes the
   backend holds for them, and byte-range locks.  Deny modes a
-  gateway did not propagate are not there to retain (D12).
+  gateway did not pass through are not there to retain (D12).
 - Not retained: layouts, sessions, the old client ID's stateids.
 - Delegations: unchanged from RFC 8881.  See D7.
 
 Retained state behaves as if still held.  Other clients get
 NFS4ERR_DENIED or NFS4ERR_SHARE_DENIED, not a grace error.  This
-is the explicit override of the Section 8.4.3 MUST.
+is the explicit override of the Section 8.4.3 MUST, and it lasts
+until a limit in D3 is reached.  After that, Section 8.4.3
+applies again.
 
-### D3. Two intervals, one timer
+### D3. Two intervals, two limits
 
 **Proposal.**
 
 - **Absence interval:** from lease expiry of the old instance
   until a new instance is confirmed.  Bounded by the backend's
-  absence limit, a local policy value.  When it runs out, the
-  backend releases the state as it would today.
+  absence limit, a local policy value.
 - **Reclaim interval:** from confirmation of the new instance
-  until its RECLAIM_COMPLETE.  No separate timer.  Remaining
-  retained state is kept as long as the new instance's lease is
-  renewed.  The backend MAY impose a cap.
+  until its RECLAIM_COMPLETE.  Bounded by the backend's reclaim
+  cap, a local policy value that every backend MUST have.  The
+  cap is measured from confirmation.  Until it is reached,
+  retained state not yet reclaimed is kept as long as the new
+  instance's lease is renewed.
+- **What a limit does.**  When either limit is reached, the
+  retained state it governs stops blocking conflicting requests.
+  It need not be destroyed.  The backend MAY release it at once,
+  or keep it as RFC 8881 Section 8.4.3 allows for expired state
+  and revoke it when the first conflicting request arrives.  A
+  reclaim that finds the state still there succeeds, and safely:
+  nothing that conflicts was granted, so the invariant in D12
+  holds.  A reclaim for state that was released fails (D5).
+- **What the cap does not touch.**  State the new instance has
+  already reclaimed is ordinary state of a live client.  The cap
+  governs only the unreclaimed remainder.
+- **Administrative release** of retained state has the effect of
+  a limit followed by immediate release.
 
-Why: this removes the need to advertise a window length.  The
-gateway needs to know only whether state survived, which D1
-tells it.  The front-side grace period can be whatever the
-gateway chooses, because the gateway is renewing its lease
-throughout.
+Neither limit is advertised.  The gateway needs to know only
+whether reclaims can succeed, which D1 tells it, and each
+reclaim's result is authoritative (D8).  A gateway whose
+front-side grace period runs past the cap may have late reclaims
+refused, and its clients are then told their state is lost.  To
+make that rare, the reclaim cap SHOULD be no shorter than a
+floor expressed in backend lease periods (Section 7, item 5).
+
+Why the cap is mandatory: without it, a faulty gateway that
+returns, renews its lease, and never sends RECLAIM_COMPLETE
+blocks direct clients indefinitely with state nobody is going to
+reclaim.  A gateway that reclaims the state holds it
+legitimately; the cap is aimed at the remainder.
+
+**Loss of lease during the reclaim interval.**  If the new
+instance is partitioned after confirmation, both limits are
+running.  The cap is not paused.  The unreclaimed remainder
+stops blocking at the cap; the state the instance had already
+reclaimed gets the full absence limit.
 
 Consequence: a partitioned (not restarted) gateway that returns
 with the same verifier inside the absence limit resumes with its
 state intact.  For a retaining client the absence limit acts as
 a longer lease.
 
-Rejected: a single retention window advertised as an attribute.
-It forces the gateway to fit its front-side grace into a number
-chosen by the backend.
+Rejected:
+- A single retention window advertised as an attribute.  It
+  forces the gateway to fit its front-side grace into a number
+  chosen by the backend.
+- An optional cap on the reclaim interval.  Availability for
+  direct clients would then depend on a policy the backend need
+  not have.
+- A limit that destroys state.  Simpler to describe and test,
+  but it forbids the courtesy Section 8.4.3 allows, for no gain
+  to direct clients.
+- Pausing the cap while the lease is expired.  A gateway that
+  flaps could stretch the bound to the cap plus several absence
+  limits.
 
 ### D4. Reuse existing reclaim operations
 
@@ -166,9 +228,19 @@ chosen by the backend.
 are accepted from a client that has retained state, whether or
 not the server is in grace.  No new claim type.
 
-The server can tell the cases apart: it is either in its own
-grace period (ordinary reclaim, nothing retained) or it holds
-retained state for this client owner.
+The server can tell the cases apart, and the order of the test
+is fixed:
+
+1. The server is in its own grace period: the request is an
+   ordinary reclaim under RFC 8881.  Retained state is not
+   required to persist across a server restart (Section 7, item
+   6), so the server need not consult it.
+2. Otherwise, the server holds retained state for this client
+   owner: the request is matched against it (D5).
+3. Otherwise: NFS4ERR_NO_GRACE.
+
+The client sends the same request in every case and need not
+know which one applies.
 
 Rejected: a new claim type modelled on CLAIM_DELEGATE_PREV.  It
 is the cleaner analogy, but LOCK has only a boolean, so locks
@@ -178,56 +250,91 @@ would need a new operation.
 
 **Proposal.**
 
-- A LOCK reclaim succeeds when the prior instance's retained
-  locks for the same lock-owner string and file cover the
-  requested range with a compatible type.  The open stateid it
-  is presented under need not come from a reclaimed open.
 - An OPEN reclaim succeeds when the retained open for the same
   open-owner string and file includes the requested access and
   deny bits.
+- A LOCK reclaim succeeds when the prior instance's retained
+  locks for the same lock-owner string and file cover the
+  requested range with a compatible type, and the open stateid
+  it is presented under comes from reclaiming the open the lock
+  was acquired under (same open-owner string, same file).
 - No match: NFS4ERR_RECLAIM_BAD.  Nothing retained any longer:
   NFS4ERR_NO_GRACE.
+
+A reclaimed lock keeps its original association with a
+lock-owner, an open-owner, and a file.  The new instance
+reclaims the open first and then the locks under it, which is
+the order and the server path of an ordinary grace-period
+reclaim.
 
 This makes owner continuity a requirement: the new instance must
 present the same owner strings the old one did, so the gateway
 derives them deterministically from front-side identity (D9).
+That includes the open-owner of an open the gateway created only
+to carry an NLM client's locks.
 
 Why match on owners at all: the gateway lost its own record of
-who held what.  With owner matching, the backend is that record,
-and a confused or dishonest gateway client cannot take another
-client's lock during reclaim.  Without it, the first reclaim to
-arrive wins.
+who held what.  With owner matching, the backend is that record:
+a reclaim succeeds only for an owner that held the state.
+Without it, the first reclaim to arrive wins.
 
-**Unverified:** that a server can move a retained lock to a lock
-stateid under a different open.  In NFSv4 a lock stateid is tied
-to (lock-owner, open, file).
+Owner matching is a record, not authentication.  The backend
+sees opaque strings the gateway built from front-side values,
+and it cannot check which gateway client a reclaim is for.  A
+reclaim under the right owner string is honored whoever sent it
+to the gateway.  Whether a gateway client can present another
+client's owner is decided on the front side, by what the gateway
+checks before it forwards (D9).  SP4_MACH_CRED (D11) protects
+the gateway's identity toward the backend and says nothing about
+the gateway's clients.
 
-### D6. Relax the RECLAIM_COMPLETE gate
+Rejected: reclaiming a lock under a fresh, non-reclaim open.  It
+moves a retained lock to a lock stateid under a different open,
+which changes the association Section 9.1.1 describes and has
+unspecified effects on stateids, CLOSE, and LOCKU.  It also
+needs a non-reclaim OPEN before RECLAIM_COMPLETE for every lock
+reclaim (D6).
+
+### D6. Relax the RECLAIM_COMPLETE gate for OPEN
 
 **Problem.**  Per Section 18.51.3 the new instance cannot send a
 non-reclaim OPEN until it sends RECLAIM_COMPLETE.  But it cannot
-send RECLAIM_COMPLETE until front-side grace ends, and in the
-meantime it may need fresh opens: LOCK requires an open stateid,
-so reclaiming a lock for an NLM client requires an open, and a
-gateway that opens files to serve NFSv3 READ and WRITE needs
-those as well.  (A gateway could instead do that I/O with a
-special stateid; the protocol should not force the choice.)
+send RECLAIM_COMPLETE until front-side grace ends.  Lock reclaims
+do not need a fresh open, since each lock is reclaimed under its
+reclaimed open (D5).  New locking requests from gateway clients
+do not need one either: the gateway's own grace period holds
+them off.  What remains is a gateway that opens files to serve
+NFSv3 READ and WRITE.  (A gateway could instead do that I/O with
+a special stateid; the protocol should not force the choice.)
 
 **Proposal.**  For a client with retained state, the backend
-permits non-reclaim OPEN and LOCK before RECLAIM_COMPLETE and
-checks them against retained state like any other conflict.
-This is the Section 8.4.2.1 exception: the backend holds the
-complete retained state, so it can determine that a grant cannot
-conflict with a later reclaim.
+permits non-reclaim OPEN before RECLAIM_COMPLETE and checks it
+against retained state like any other conflict.  Non-reclaim
+LOCK before RECLAIM_COMPLETE still fails with NFS4ERR_GRACE.
+
+This is an update to Section 18.51.3 and to the matching
+statement in Section 8.4.2.1, in effect only for a client ID
+established with `RETAIN_STATE`.  RFC 8881 does not already
+permit it.  The Section 8.4.2.1 exception covers a server in its
+own grace period; here the server is not in grace.  The safety
+argument is the same one, though: the backend holds the complete
+retained state, so it can determine that a grant cannot conflict
+with a later reclaim.
 
 Rejected:
+- Relaxing the gate for LOCK as well.  Nothing needs it once
+  locks are reclaimed under reclaimed opens.
 - Gateway stalls all I/O until front-side grace ends.  Simple,
   but turns a gateway restart into a full-lease outage for
   NFSv3 I/O that today is not interrupted.
+- No relaxation; the gateway serves NFSv3 I/O with a special
+  stateid until RECLAIM_COMPLETE.  Leaves Section 18.51.3
+  untouched, but dictates how a gateway's back-side client does
+  I/O.  This is the fallback if the working group objects to
+  relaxing the gate.
 - A separate completion operation for retained state.  Leaves
   RECLAIM_COMPLETE semantics untouched at the cost of a new
-  operation.  This is the fallback if the working group objects
-  to relaxing the gate.
+  operation.
 
 ### D7. Delegations are out for the first version
 
@@ -252,11 +359,28 @@ CLAIM_DELEGATE_PREV.
 
 **Proposal.**
 
-- State retained: run a front-side grace period, notify NLM
-  clients with SM_NOTIFY, forward reclaims.
-- State not retained (limit exceeded, or backend lacks the
-  extension): still notify, and refuse every reclaim.  A refused
-  reclaim is the only way an NLM client learns a lock is gone.
+The decision is made once, from the EXCHANGE_ID result, and
+then each reclaim is decided by the backend.
+
+- `RECLAIMABLE_R` set: run a front-side grace period, notify
+  NLM clients with SM_NOTIFY, and forward each reclaim.  The
+  backend's answer to a forwarded reclaim is authoritative: the
+  gateway grants the front-side reclaim only if the back-side
+  one succeeded.  The gateway does not need to know whether the
+  backend is answering from retained state or from its own grace
+  period (D4); the requests are the same.  It withholds
+  RECLAIM_COMPLETE until front-side grace ends.
+- `RECLAIMABLE_R` clear: still notify, send RECLAIM_COMPLETE
+  at once, and refuse every reclaim.  This covers a return after
+  retained state was released, and a backend that restarted and
+  either has left its grace period or has no record of this
+  client owner.
+- Backend lacks the extension (NFS4ERR_INVAL, retried without
+  the flag), or declines retention (`RETAIN_STATE` not echoed,
+  D11): as for `RECLAIMABLE_R` clear.
+
+A refused reclaim is the only way an NLM client learns a lock is
+gone, which is why the gateway notifies in every case.
 
 ### D9. Owner derivation
 
@@ -265,9 +389,45 @@ recommended construction, not a mandatory one, since the backend
 treats owner strings as opaque.
 
 - NLM: lock-owner derived from the caller name and the NLM owner
-  handle.
+  handle.  NLM has no opens, so the gateway also derives a
+  synthetic open-owner from the same two values and holds one
+  backend open per synthetic open-owner and file.  All of that
+  NLM owner's locks on the file are taken under that open, and
+  the gateway closes it when the last one is released.
 - NFSv4: owner derived from the front-side client owner string
   and the front-side open-owner or lock-owner.
+
+The synthetic open has to be reclaimable from an NLM reclaim
+request alone, because the gateway has no other record after a
+restart.  The request supplies the file handle, caller name,
+and owner handle; the gateway must choose the open's share
+access by a rule that needs nothing else (Section 7, item 2).
+
+**Binding the owner to a front-side identity.**  Before it
+forwards a reclaim, the gateway checks the reclaiming client
+against whatever identity the front-side protocol authenticates,
+and derives the owner from values tied to that identity.
+
+- NFSv4: a reclaim arrives under a front-side client ID.  The
+  gateway accepts it only from a client owner in its
+  stable-storage list of clients permitted to reclaim, and
+  under the principal RFC 8881 requires for that client owner.
+  The derived owner includes the front-side client owner string,
+  so it is bound to that check without carrying the principal
+  itself.
+- NLM: the caller name and owner handle are supplied in the
+  request and nothing authenticates them.  The gateway accepts a
+  reclaim only for a caller in its NSM monitor list.  It can
+  also record the RPC credential or source address with that
+  entry and require a match; with RPCSEC_GSS that is a real
+  binding, with AUTH_SYS it is not.
+
+Limit, to be stated in the draft: on an unauthenticated NLM
+front side, a host that can reach the gateway and present
+another client's caller name and owner handle during the grace
+period can reclaim that client's lock.  The same is true of an
+NLM server that is not a gateway, so the gateway adds no new
+exposure, but owner matching does not remove it either.
 
 Thorn: both front-side components can be up to 1024 bytes, and
 so is the back-side limit.  The construction needs a hash, and
@@ -312,28 +472,56 @@ normal operation as well as after a restart.
   guarantee exactly as weak as it was before: the gateway
   re-grants it during its own grace period and the backend is
   not involved.
-- A gateway that uses the extension SHOULD propagate deny modes:
-  the derived open carries at least the deny bits of the
-  front-side open or NLM_SHARE it stands for.  Then D2 retains
-  them and D5 reclaims them.
-- A gateway that cannot propagate a deny mode has two
-  defensible behaviors, and the draft should name both: refuse
-  the request, or grant it and document that it binds gateway
-  clients only.  The draft does not pick, since the gap exists
-  without this extension.
+- The invariant behind a successful front-side reclaim: the
+  backend's conflict protection for that state remained in force
+  from the original grant until the new instance recovered it.
+  State with no derived counterpart cannot meet it.
+- A gateway handles share deny modes in one of two modes.  The
+  choice is the implementer's, and the draft defines both.
+  - **Pass-through.**  The derived open carries at least the deny
+    bits of the front-side open or NLM_SHARE it stands for.  The
+    backend enforces them against direct clients, D2 retains
+    them, and D5 reclaims them.  The invariant holds.
+  - **Local-only.**  The derived open carries no deny bits.  The
+    gateway enforces the deny mode in its own tables, and it
+    binds clients of this gateway only, before and after a
+    restart.  A front-side reclaim is re-granted from the
+    gateway's own grace-period arbitration.  That is a weaker
+    service, and the draft does not count it as recovered share
+    exclusion.
+- A gateway that wants neither can refuse a request that carries
+  a deny mode.
+- Only pass-through protects a gateway client against direct
+  clients.  The draft says so plainly, because a gateway client
+  has no way to learn which mode it was given: neither NFSv4 nor
+  NLM_SHARE can signal it.
 
-Interaction with D9: a deny mode conflicts with opens by other
-open-owners, including other owners of the same client.  With
-one back-side open-owner per front-side owner, the backend
-arbitrates deny modes among gateway clients as well as against
-direct clients.  A gateway that aggregates many front-side
-owners under one back-side open-owner must arbitrate among its
-own clients itself, and after a restart it cannot rely on D5 to
-tell their opens apart.
+Two rules follow from making this a choice.
 
-Rejected: requiring propagation (MUST).  It would make the
-extension unusable by a gateway whose back-side client cannot
-send deny modes, for no gain in lock recovery.
+- **The mode is stable across a restart.**  A gateway that was
+  local-only before the restart and pass-through after it sends
+  a reclaim OPEN with deny bits the retained open lacks, and D5
+  answers NFS4ERR_RECLAIM_BAD.  The mode is therefore persistent
+  configuration.  A gateway whose mode did change retries the
+  reclaim without deny bits and treats the result as local-only.
+- **Pass-through needs one back-side open-owner per front-side
+  owner** (D9).  A deny mode conflicts with opens by other
+  open-owners, including other owners of the same client, so
+  with that mapping the backend arbitrates deny modes among
+  gateway clients as well as against direct clients.  A gateway
+  that aggregates many front-side owners under one back-side
+  open-owner is local-only for conflicts among its own clients,
+  whatever bits it sends, and after a restart it cannot rely on
+  D5 to tell their opens apart.
+
+Rejected:
+- Requiring pass-through (MUST).  It would make the extension
+  unusable by a gateway whose back-side client cannot send deny
+  modes, for no gain in lock recovery.
+- Recommending pass-through (SHOULD) with local-only as the
+  exception.  The gap exists without this extension, and two
+  defined modes with stated guarantees say more than a SHOULD
+  an implementer may not be able to follow.
 
 ## 4. Worked Sequence: Gateway Restart, One NLM Client
 
@@ -346,8 +534,9 @@ gateway, B the backend, D a client that mounts B directly.
    flags|=RETAIN_STATE)`.  B echoes the flag.  `CREATE_SESSION`.
    `RECLAIM_COMPLETE`.
 2. C to G: `NLM_LOCK(fh, caller="c", oh=X, range, exclusive)`.
-3. G to B: `PUTFH; OPEN(CLAIM_FH, access=BOTH)`, then
-   `LOCK(WRITE_LT, range, reclaim=false, lock-owner=f("c", X))`.
+3. G to B: `PUTFH; OPEN(CLAIM_FH, access=BOTH,
+   open-owner=g("c", X))`, then `LOCK(WRITE_LT, range,
+   reclaim=false, lock-owner=f("c", X))` under that open.
 4. G records C in its NSM monitor list on stable storage.
 
 **Absence**
@@ -360,26 +549,53 @@ gateway, B the backend, D a client that mounts B directly.
 
 8. G to B: `EXCHANGE_ID(co_ownerid=G, verifier=v2,
    flags|=RETAIN_STATE)`.  B returns `RETAIN_STATE |
-   STATE_RETAINED_R`.
+   RECLAIMABLE_R`.
 9. G to B: `CREATE_SESSION`.  B destroys the old sessions and
    client ID, and keeps the old instance's opens and locks as
    retained state.
 10. G starts its front-side grace period and sends `SM_NOTIFY`
     to C.
 11. C to G: `NLM_LOCK(reclaim=true, same owner and range)`.
-12. G to B: `PUTFH; OPEN(CLAIM_FH, access=BOTH)`.  Permitted
-    before RECLAIM_COMPLETE by D6.
+12. G to B: `PUTFH; OPEN(CLAIM_PREVIOUS, access=BOTH,
+    open-owner=g("c", X))`.  B matches the retained open from
+    step 3 (D5), moves it to the new client ID, returns a new
+    stateid.
 13. G to B: `LOCK(WRITE_LT, range, reclaim=true,
-    lock-owner=f("c", X))`.  B matches the retained lock (D5),
-    moves it to the new client ID, returns a new stateid.
+    lock-owner=f("c", X))` under the reclaimed open.  B matches
+    the retained lock (D5), moves it to the new client ID,
+    returns a new stateid.
 14. G to C: `NLM4_GRANTED`.
 15. Front-side grace ends.  G to B:
     `RECLAIM_COMPLETE(rca_one_fs=false)`.  B releases all
-    remaining retained state, including the old open from step 3.
+    remaining retained state.
+
+An NFSv3 READ or WRITE from C between steps 9 and 15 needs no
+reclaim.  If G opens the file to serve it, that is a non-reclaim
+OPEN before RECLAIM_COMPLETE, permitted by D6.
+
+**Return before the lease expires**
+
+The common case: G reboots in less than L.
+
+- Steps 6 and 7 do not occur as written.  The old instance's
+  open and lock are ordinary unexpired state, and D's request is
+  denied for that reason.
+- Step 8 is the same request and the same result.  B sets
+  `RECLAIMABLE_R` because it holds state of a prior instance
+  that it will retain on confirmation (D1).  Nothing is retained
+  yet.
+- Step 9 is where retention happens: `CREATE_SESSION` confirms
+  the new instance, and B keeps the old instance's opens and
+  locks as retained state instead of releasing them.
+- Steps 10 through 15 are unchanged.
 
 **Return after the absence limit**
 
-- Step 8 returns `RETAIN_STATE` without `STATE_RETAINED_R`.
+- This is the case where B released the state at the limit, or
+  revoked it for a conflicting request afterward.  If B kept it
+  and no conflict arrived, the sequence above runs unchanged
+  (D3).
+- Step 8 returns `RETAIN_STATE` without `RECLAIMABLE_R`.
 - G still sends `SM_NOTIFY` (D8).  It sends `RECLAIM_COMPLETE`
   at once and denies C's reclaim.
 
@@ -396,7 +612,7 @@ The sequence differs from Section 4 in these ways.
   the list of clients allowed to reclaim.
 - A front-side `OPEN(CLAIM_PREVIOUS)` maps to a back-side
   `OPEN(CLAIM_PREVIOUS)` with the derived open-owner.  Share
-  deny modes survive if the gateway propagated them (D12).
+  deny modes survive if the gateway passed them through (D12).
   Front-side lock reclaims map as in Section 4.
 - The gateway sends the back-side RECLAIM_COMPLETE when every
   recorded front-side client has sent its own, or when the
@@ -407,7 +623,8 @@ The sequence differs from Section 4 in these ways.
 ## 6. Backend Restart
 
 Claim under test: no wire change is needed.  It holds, with two
-caveats.
+caveats and one limit: when both restart, continuity is best
+effort.
 
 - **Reclaim.**  The gateway holds all derived state in memory and
   reclaims it during the backend's grace period as any NFSv4
@@ -423,56 +640,153 @@ caveats.
   An NLM client cannot be told at all.  This is a limitation of
   NLM, to be documented, not fixed.
 - **Caveat 2, both restart.**  The backend is in ordinary grace
-  and has no retained state.  The gateway forwards front-side
-  reclaims as ordinary reclaims.  This works only if the
-  backend's grace period outlasts the gateway's.  A backend that
-  records in its client-tracking database that a client owner is
-  a retaining client can hold its grace period open until that
-  client's RECLAIM_COMPLETE, which Section 8.4.2.1 already
-  permits.  The cost is a longer grace period for every client
-  of the backend, so this should be policy, bounded by the
-  absence limit.
+  and has no retained state.  It sets `RECLAIMABLE_R` at
+  EXCHANGE_ID because it is in grace and has the gateway's
+  client owner on record (D1), so the gateway follows the same
+  path as for a gateway restart (D8) and forwards front-side
+  reclaims, which the backend treats as ordinary reclaims (D4).
+  If the backend's grace period ended before the gateway
+  returned, the flag is clear and the gateway refuses every
+  reclaim.  If it ends while the gateway is still forwarding,
+  the remaining reclaims fail with NFS4ERR_NO_GRACE and the
+  gateway refuses those.  So continuity holds only if the
+  backend's grace period outlasts the gateway's, and RFC 8881
+  does not promise that: "The server may also terminate the
+  grace period before all clients have done a global
+  RECLAIM_COMPLETE" (Section 8.4.2.1).
+
+**Proposal for both-restart: safety is required, continuity is
+best effort.**
+
+- **Safety (required).**  A gateway grants a front-side reclaim
+  only if the back-side reclaim succeeded (D8).  If the backend
+  left grace early, the reclaim fails, the gateway refuses, and
+  the gateway client is told its state is lost.  Nothing is
+  silently re-granted.  This needs no backend cooperation.
+- **Continuity (best effort).**  A backend SHOULD record in
+  stable storage that a client owner is a retaining client, and
+  SHOULD hold its grace period open until that client's
+  RECLAIM_COMPLETE.  Section 8.4.2.1 already permits a grace
+  period that lasts until every known client has completed.
+  The backend bounds the wait by the absence limit when the
+  gateway has not returned, and by the reclaim cap once it has
+  (D3).
+- A retaining client stays eligible to reclaim across a backend
+  restart for the whole absence interval, although its lease has
+  expired.  This changes when a backend makes the stable-storage
+  record Section 8.4.3 describes.  That record marks a client
+  whose lease expired, because "another client could have
+  acquired a conflicting" lock, and a reclaim from a marked
+  client is rejected with NFS4ERR_NO_GRACE.  For a retaining
+  client the reason does not hold until retained state is
+  released, so the backend marks the client when it releases or
+  revokes retained state (at a limit, at the first conflicting
+  request after one, or administratively), not at lease expiry.
+
+Why not required: holding grace open delays every client of the
+backend, by up to the absence limit when the gateway never
+returns.  A backend operator has to be able to decline that
+cost.  What the draft cannot leave to policy is the safety
+half.
+
+**Backend restart during an absence or reclaim interval.**
+Retained state is not required to persist (Section 7, item 6).
+Where it does not, the restart converts the case into one of
+these.
+
+- During the absence interval: when the gateway returns, this is
+  both-restart, as above.
+- During the reclaim interval: the gateway has not restarted
+  again.  It sees the backend restart, establishes a new client
+  ID, and reclaims the derived state it has already recovered as
+  any client does.  Front-side reclaims still arriving are
+  forwarded as ordinary reclaims.  The gateway sends
+  RECLAIM_COMPLETE to the new backend instance when front-side
+  grace ends.  The same safety rule decides each one.
 
 Recommendation: keep this material in the draft as normative
-gateway behavior with no protocol elements.
+gateway and backend behavior with no new wire elements.
 
 ## 7. Thorns Still Open
 
 1. **D6 is the most likely objection.**  It changes a MUST in
-   Section 18.51.3 for retaining clients.  The fallback is a
-   separate completion operation.
-2. **D5 lock transfer across opens** needs an implementer's
-   check before the draft relies on it.
+   Section 18.51.3 for retaining clients, now for OPEN only.
+   The fallback is to drop it and have the gateway serve NFSv3
+   I/O with a special stateid until RECLAIM_COMPLETE.  Whether
+   that is acceptable for a gateway's back-side client needs an
+   implementer's answer.
+2. **Share access of a synthetic open** (D9).  The gateway must
+   pick it from the NLM reclaim request alone.  Deriving it from
+   the lock type works for one lock, but an NLM owner can hold
+   shared and exclusive locks on one file, and the reclaims
+   arrive in no fixed order.  Either the gateway always opens
+   with the widest access the lock types can need, which fails
+   on a file the caller can only read, or a later reclaim
+   upgrades an open already reclaimed, and D5 has to say how an
+   upgrade matches a retained open that has already moved.
 3. **Owner derivation collisions** (D9).
 4. **Blocked direct clients.**  A dead gateway blocks direct
-   clients for the whole absence limit.  The backend needs an
-   administrative release, and the draft should say what clients
-   holding the lost state then see.
-5. **Absence limit guidance.**  Long enough for a reboot, short
-   enough to be tolerable.  No number proposed yet.
+   clients for the whole absence limit, and a returned gateway
+   that never completes blocks them for the reclaim cap (D3).
+   Beyond those bounds the backend needs an administrative
+   release.  What gateway clients then see: for state not yet
+   reclaimed, a refused reclaim, which NLM can express.  For
+   state already reclaimed, release is ordinary revocation, with
+   the NLM limitation of Section 6, caveat 1.
+5. **Limit guidance.**  The absence limit: long enough for a
+   reboot, short enough to be tolerable.  The reclaim cap: a
+   floor in backend lease periods, long enough for a typical
+   front-side grace period.  No numbers proposed yet.  If no
+   reasonable floor fits real front-side grace periods, the cap
+   has to be advertised after all.
 6. **Persistence of retained state across a backend restart.**
-   Not required here.  Caveat 2 covers the case without it.
+   Not required here.  Section 6 covers the case without it, at
+   the price of best-effort continuity when both restart.  Is
+   that acceptable, or does a deployment need the grace
+   extension to be a MUST?
 7. **Uncommitted writes.**  A gateway restart changes the
    front-side write verifier and clients resend.  Outside this
    document, but a reader will ask.
-8. **Locally enforced state** (D12).  Is SHOULD the right
-   strength for propagating deny modes, and is there other
-   front-side state that gateways enforce without derived state?
+8. **Locally enforced state** (D12).  Is there front-side state
+   other than deny modes that gateways enforce without derived
+   state?  And will the working group accept a local-only mode
+   that a gateway client cannot detect?
+9. **Bookkeeping for state kept past a limit** (D3).  The
+   backend has to mark the client in stable storage at the first
+   conflicting grant, not at the limit.  Needs an implementer's
+   check; if impractical, a limit releases the state outright.
+10. **NFS4ERR_GRACE without a visible restart** (Section 6).
+    Unverified that NFSv4 gateway clients tolerate it from a
+    gateway they did not see restart.
 
-## 8. Changes This Implies for the Outline
+## 8. Where This Lands in the Outline
 
-- Reframe sections 1 and 6 around client-restart state retention,
-  with the gateway as the use case.
-- Section 6.1: two flags; drop "advertise the retention window".
-- Section 6.2: split into absence interval and reclaim interval.
-- Section 6.3: add the matching rule and the relaxed
-  RECLAIM_COMPLETE gate.
-- Section 6.6 and 7.5: fold in Section 6 above, including the
-  backend grace-extension policy.
-- Section 7.4: delegations become a prohibition plus a note on
-  the path forward.
-- Sections 7.3 and 7.4: add deny-mode propagation (D12) for
-  NLM_SHARE and NFSv4 opens.
-- Section 12: the six open questions are answered by D1, D3, D5,
-  D7, and Section 6.  Failover between gateway hosts stays a
-  non-goal.  Replace the list with Section 7 above.
+`outline.md` has been revised to match this document.  Section
+numbers below are the outline's.
+
+| Here | Outline |
+|------|---------|
+| Section 1, mechanism as client-restart state retention | Abstract, 1, 5 |
+| D1, flags and the reclaimable hint | 6.1 |
+| D2, what is retained | 6.2 |
+| D3, two intervals, two limits | 6.3, 8 |
+| D4, reuse of reclaim operations, order of the test | 6.4, 6.8 |
+| D5, matching rule, lock under its reclaimed open | 6.4 |
+| D6, gate relaxed for OPEN | 6.5 |
+| D7, delegations | 4.3, 7.6 |
+| D8, what the gateway tells its clients | 7.4 |
+| D9, owner derivation, synthetic open-owner, identity binding | 7.2, 7.5, 10 |
+| D10, repeated restarts | 5, 6.6 |
+| D11, who may ask for retention | 6.1, 10 |
+| D12, pass-through and local-only deny modes | 7.1, 7.3, 7.5 |
+| Section 4, worked sequences | 5 |
+| Section 5, NFSv4 gateway clients | 7.6 |
+| Section 6, backend restart, both restart | 4.2, 6.8, 7.7, 7.8 |
+| Section 7, thorns | 12 |
+
+Not from a decision here: the outline's Section 6 opening lists
+every RFC 8881 behavior the extension changes and gives the
+compatibility argument under RFC 8178.  Each entry traces to
+Section 1, D2, D3, D4, D6, or Section 6 above.
+
+Failover between gateway hosts stays a non-goal (outline 4.3).

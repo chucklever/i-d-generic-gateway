@@ -118,16 +118,18 @@ gateway clients, still running, and they expect to reclaim.
 
 | State | Front side | Derived state at the backend |
 |-------|-----------|------------------------------|
-| Open, share reservation | NFSv4 OPEN; NLM_SHARE | OPEN, with matching access and deny |
+| Open, share reservation | NFSv4 OPEN; NLM_SHARE | OPEN, with matching access, and matching deny when the gateway passes it through |
 | Byte-range lock | NLM lock; NFSv4 LOCK | LOCK |
 | Delegation | Delegation granted by the gateway | Delegation held by the gateway, if any |
 | Layout | Layout granted by the gateway | Layout held by the gateway, if any |
 
 Two properties matter for recovery.
 
-- **Opens and locks are mirrored.**  Each piece of front-side
-  state has corresponding derived state, and the backend
-  enforces it against direct clients.
+- **Opens and locks are mirrored, when the gateway passes them
+  through.**  Front-side state that has corresponding derived
+  state is enforced by the backend against direct clients.
+  State a gateway enforces only in its own tables is not; share
+  deny modes are the known case (Sections 7.1 and 8).
 - **Delegations and layouts hide state.**  A gateway client that
   holds a delegation opens and locks the file locally.  Neither
   the gateway nor the backend knows about that state until the
@@ -256,8 +258,14 @@ A gateway can be involved with pNFS in three ways.
    recovery is the gateway's own (RFC 8881 Section 12.7).  The
    one gateway-specific issue is durability: the gateway must
    not acknowledge data as stable to a gateway client until the
-   back-side LAYOUTCOMMIT has succeeded, because a gateway
-   restart leaves uncommitted data undefined (Section 12.7.1).
+   data is committed at the storage devices and, where the
+   layout type needs it to make that data reachable (file size,
+   provisionally allocated blocks), the back-side LAYOUTCOMMIT
+   has succeeded.  LAYOUTCOMMIT commits the layout's changes to
+   the metadata server; it does not make the data stable, and
+   its scope "depends on the storage protocol in use" (Section
+   12.5.4).  A gateway restart leaves what was not committed
+   undefined (Section 12.7.1).
 2. **Front-side layouts.**  The gateway acts as a metadata server
    to its clients, granting layouts that depend on layouts it
    holds from the backend.  After a gateway restart, a gateway
@@ -317,8 +325,12 @@ protocol.
 ### 9.2. Proposed Scope for a First Solution
 
 - Opens, share reservations, and byte-range locks.
-- Gateway restart, both-restart, and the gateway behavior
-  required for backend restart and lease loss.
+- Gateway restart, and the gateway behavior required for backend
+  restart and lease loss.
+- Both-restart, to this extent: no silent loss of exclusion is
+  required (requirement 1 in Section 10), and continuity of
+  state is best effort, since it depends on the backend's grace
+  period outlasting the gateway's.
 - NFSv3 with NLM and all NFSv4 minor versions on the front side.
 - NFSv4.2 on the back side, since that is the only version that
   can be extended (RFC 8178).
@@ -340,14 +352,18 @@ Proposed division of work:
   the reclaim-mode LAYOUTCOMMIT that arrives at a backend not in
   grace.
 - **Layout-type documents:** validation of recovered layout
-  updates, fencing, and device mapping, per layout type.  For
-  Flexible Files version 2 that is
-  draft-haynes-nfsv4-flexfiles-v2-proxy-server.  The file
-  layout (RFC 8881), Flexible Files version 1 (RFC 8435), SCSI
-  (RFC 8154), and NVMe (RFC 9561) layouts would each need their
-  own treatment if front-side layouts through a gateway are to
-  be supported for them.
-- **Not here:** arrangement 3 in Section 7.4.
+  updates, fencing, and device mapping, per layout type.  The
+  file layout (RFC 8881), Flexible Files version 1 (RFC 8435)
+  and version 2, SCSI (RFC 8154), and NVMe (RFC 9561) layouts
+  would each need their own treatment if front-side layouts
+  through a gateway are to be supported for them.  No existing
+  document provides it.
+- **Not here:** arrangement 3 in Section 7.4.  That is the
+  subject of draft-haynes-nfsv4-flexfiles-v2-proxy-server: a
+  proxy named in layouts the backend's metadata server issues.
+  It does not specify recovery for a gateway that issues its own
+  front-side layouts (arrangement 2), and is related work, not a
+  solution to the layout problem stated here.
 
 Whether arrangement 2 is a deployment anyone needs is an open
 question (Section 12).
@@ -376,13 +392,19 @@ question (Section 12).
    was lost.
 2. **Unmodified gateway clients.**  Gateway clients recover with
    the mechanisms their protocol already defines.
-3. **Bounded cost to direct clients.**  State held for an absent
-   gateway is released after a bounded time, and an
-   administrator can release it sooner.
+3. **Bounded cost to direct clients.**  State held for a gateway
+   that is absent, or that has returned and not finished
+   recovering, stops blocking direct clients after a bounded
+   time, and an administrator can release it sooner.
 4. **Fallback.**  A gateway can detect a backend without the
    solution and fall back to refusing stateful requests.
-5. **No new trust in gateway clients.**  Recovery does not let
-   one gateway client obtain state another one held.
+5. **No new trust in gateway clients.**  Recovery through a
+   gateway does not make it easier for one gateway client to
+   obtain state another one held than recovery from a
+   non-gateway server of the same front-side protocol does.
+   Where the front-side protocol does not authenticate a
+   reclaiming client, as with NLM over AUTH_SYS, a gateway is no
+   stronger than that protocol.
 6. **Limited trust in gateways.**  The backend decides which
    clients are entitled to the special handling.
 
@@ -394,6 +416,10 @@ question (Section 12).
 - The backend sees one client where there are many.  It cannot
   check which gateway client a reclaim is for; it relies on the
   gateway, which has itself just lost its records.
+- The gateway can identify a reclaiming client only as well as
+  the front-side protocol allows.  NFSv4 ties a reclaim to a
+  client ID and its principal.  NLM identifies the holder by a
+  caller name and owner handle that the client supplies.
 - A gateway that grants reclaims it cannot back gives
   applications false assurance about data they believe was
   protected.
