@@ -120,7 +120,7 @@ gateway clients, still running, and they expect to reclaim.
 |-------|-----------|------------------------------|
 | Open, share reservation | NFSv4 OPEN; NLM_SHARE | OPEN, with matching access, and matching deny when the gateway passes it through |
 | Byte-range lock | NLM lock; NFSv4 LOCK | LOCK |
-| Delegation | Delegation granted by the gateway | Delegation held by the gateway, if any |
+| Delegation, including an attribute delegation (RFC 9754) | Delegation granted by the gateway | Delegation held by the gateway, if any |
 | Layout | Layout granted by the gateway | Layout held by the gateway, if any |
 
 Two properties matter for recovery.
@@ -133,7 +133,9 @@ Two properties matter for recovery.
 - **Delegations and layouts hide state.**  A gateway client that
   holds a delegation opens and locks the file locally.  Neither
   the gateway nor the backend knows about that state until the
-  delegation is returned.  A gateway client that holds a layout
+  delegation is returned.  If it is an attribute delegation (RFC
+  9754 Section 5), the client also holds the authoritative
+  access and modify times.  A gateway client that holds a layout
   writes to storage devices without the gateway seeing the I/O.
 
 ## 6. Failure Cases
@@ -236,10 +238,23 @@ ordinary two-party case and raises nothing new.
   this as a use case: an NFSv3 server that is an NFSv4.2 client
   holds delegations so it can serve attributes without asking
   the backend.  Losing the delegation on gateway restart costs
-  performance only.  TODO: check that claim for a delegation
-  that carries timestamps (RFC 9754 Section 5), where the
-  gateway is the authority for the access and modify times
-  until it returns the delegation.
+  performance only, with two exceptions.
+- A gateway that holds a back-side write delegation may service
+  its clients' locks locally, as RFC 8881 Section 10.4.2 has a
+  delegation holder do.  Those locks have no derived state.  The
+  delegation is their only protection at the backend, and a
+  gateway restart removes it.
+- A back-side attribute delegation (RFC 9754 Section 5) makes
+  the gateway the authority for the access and modify times
+  until it returns the delegation.  A gateway
+  restart loses the times only the gateway held: access times
+  for reads served from its cache, the modify times it reported
+  for data it had written through, and any time a gateway client
+  set explicitly that the gateway had not yet sent to the
+  backend.  The last is an acknowledged change that is lost.
+  When an ordinary client crashes, the applications that saw
+  those times are gone as well.  A gateway's clients survive and
+  remember them.
 - A gateway may grant front-side delegations.  That is safe only
   while the gateway holds a back-side delegation covering the
   same file, since otherwise the backend may grant conflicting
@@ -250,6 +265,13 @@ ordinary two-party case and raises nothing new.
   optional.  The gateway client then reclaims a delegation the
   gateway cannot vouch for, together with opens and locks that
   were never visible to the backend.
+- A front-side attribute delegation hides the access and modify
+  times as well as opens and locks.  The gateway client is their
+  authority, and the gateway learns them only by CB_GETATTR or
+  when the delegation is returned.  After a gateway restart the
+  client still holds them.  They reach the backend only if the
+  client can reclaim the delegation, since it can pass them back
+  only while it holds one.
 - On backend restart the gateway reclaims its delegation.  The
   backend may grant it as already recalled, and the gateway then
   has to recall the front-side delegation.

@@ -397,10 +397,53 @@ hold back-side delegations for its own use.  RFC 9754 Section
 NFSv4.2 client and holds delegations so it can answer attribute
 queries without a GETATTR to the backend.  This extension does
 not retain those delegations (D2), so a gateway restart loses
-them.  **Unverified:** that the loss costs only performance when
-the delegation carries timestamps under RFC 9754.  The gateway
-is then the authority for the access and modify times, and
-passes them back at DELEGRETURN.
+them.  The loss costs more than performance in two cases.
+
+**Locks and opens under a back-side delegation.**  "When a
+client holds an OPEN_DELEGATE_WRITE delegation, lock operations
+are performed locally" (RFC 8881 Section 10.4.2).  A gateway
+that does this with its clients' locks creates no derived state
+for them.  The delegation was their only protection at the
+backend, and it is not retained.  After a restart there is
+nothing to reclaim, and direct clients were free to take
+conflicting locks once the delegation was gone.  So a gateway
+that uses the extension MUST create derived opens and locks at
+the backend even while it holds a delegation on the file.  This
+is another case of D12.  **Unverified:** that a back-side client
+implementation can be made to send LOCK while it holds a write
+delegation.
+
+**Delegated timestamps** (RFC 9754 Section 5).  The gateway is
+the authority for the access and modify times until it returns
+the delegation.  A restart loses the values only the gateway
+held.
+
+- Access times for reads the gateway served from its cache.
+- Modify times the gateway reported to its clients for data it
+  had already written to the backend.  The backend has its own
+  modify time for those writes, which differs by the flush delay
+  and by the difference between the two clocks.  After the
+  restart, gateway clients see the modify time change, possibly
+  backward, with no other writer.  An NFSv3 client treats that
+  as a changed file and drops its cached data.  No data is lost.
+  (Inferred: RFC 9754 does not say the backend stops keeping its
+  own times while the delegation is out.)
+- A time that a gateway client set explicitly with SETATTR, if
+  the gateway absorbed it under the delegation.  That time is
+  lost although the gateway acknowledged it.  An NFSv3 server
+  "must be able to recover without data loss", with unstable
+  WRITE the only exception (RFC 1813 Section 4.8).
+
+Rule for the third case: a gateway MUST send an explicit time
+change to the backend before it replies.  The second case can be
+avoided by sending a SETATTR of the delegated modify time in the
+compound that writes the data.  **Unverified:** that RFC 9754
+allows that SETATTR at any time while the delegation is held.
+Its text constrains only the order relative to DELEGRETURN.
+
+Why this is a gateway problem: when an ordinary client crashes,
+the applications that saw its delegated times are gone too.  A
+gateway's clients survive and remember what they were told.
 
 ### D8. What the gateway tells its clients
 
@@ -528,7 +571,10 @@ state in its own tables without creating derived state for it.
 Share deny modes are the known case: a gateway can grant a deny
 mode to its client and open the backend file with no deny mode.
 Such state excludes other clients of the same gateway only, in
-normal operation as well as after a restart.
+normal operation as well as after a restart.  Locks and opens
+that a gateway services locally under a back-side delegation are
+a second case (D7).  They are protected in normal operation, by
+the delegation, and unprotected once a restart loses it.
 
 **Proposal.**
 
@@ -836,9 +882,10 @@ gateway and backend behavior with no new wire elements.
 7. **Uncommitted writes.**  A gateway restart changes the
    front-side write verifier and clients resend.  Outside this
    document, but a reader will ask.
-8. **Locally enforced state** (D12).  Is there front-side state
-   other than deny modes that gateways enforce without derived
-   state?  And will the working group accept a local-only mode
+8. **Locally enforced state** (D12).  Two cases are known: deny
+   modes, and locks and opens serviced under a back-side
+   delegation (D7).  Is there other front-side state that
+   gateways enforce without derived state?  And will the working group accept a local-only mode
    that a gateway client cannot detect?
 9. **Bookkeeping for state kept past a limit** (D3).  The
    backend has to mark the client in stable storage at the first

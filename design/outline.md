@@ -254,6 +254,8 @@ Short; refers to the problem statement for the full analysis.
   Local-only: binds clients of this gateway only; a weaker
   service, not recovered share exclusion.
 - A gateway may instead refuse requests that carry a deny mode.
+- Locks and opens serviced locally under a back-side delegation
+  are not derived state either (Section 7.6).
 - A gateway client cannot detect the mode.
 - The mode is stable across a restart.
 - Pass-through needs one back-side open-owner per front-side
@@ -309,6 +311,11 @@ Short; refers to the problem statement for the full analysis.
   this extension.  Path forward through CLAIM_DELEGATE_PREV (D7).
 - Back-side delegations the gateway holds for its own use (RFC
   9754 Section 5.1) are allowed and are not retained.
+- Under a back-side delegation the gateway MUST still create
+  derived opens and locks; RFC 8881 Section 10.4.2 would
+  otherwise have it lock locally.
+- Delegated timestamps: what a restart loses, and the rule that
+  an explicit time change reaches the backend before the reply.
 
 ### 7.7. Backend Restart
 
