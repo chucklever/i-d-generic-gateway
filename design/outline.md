@@ -143,7 +143,8 @@ Short; refers to the problem statement for the full analysis.
   value.
 - Reclaim interval: from confirmation until RECLAIM_COMPLETE.
   Bounded by the reclaim cap, a server policy value the server
-  MUST have, measured from confirmation.  Floor in lease
+  MUST have, measured from the confirmation that began the
+  interval (Section 6.6 for repeated restarts).  Floor in lease
   periods.
 - At a limit, retained state stops blocking conflicting
   requests.  The server may release it or keep it until the
@@ -184,6 +185,9 @@ Short; refers to the problem statement for the full analysis.
 - RECLAIM_COMPLETE releases all retained state not yet reclaimed.
 - Repeated restarts: retained state accumulates across instances
   until a RECLAIM_COMPLETE (D10).
+- Each piece of retained state keeps the reclaim-cap clock
+  started by the first confirmation after it was retained; a
+  later confirmation does not restart it (D10).
 
 ### 6.7. Errors
 
@@ -350,8 +354,6 @@ From `design.md`, Section 7.
   mode that clients cannot detect is acceptable (D12).
 - Whether NFSv4 gateway clients tolerate NFS4ERR_GRACE from a
   gateway they did not see restart.
-- Which confirmation starts the reclaim cap when retained state
-  accumulates across repeated restarts (D3, D10).
 - Whether NFS4ERR_RECLAIM_CONFLICT has a use (Section 6.7).
 
 ## References

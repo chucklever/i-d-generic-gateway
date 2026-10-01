@@ -166,7 +166,9 @@ applies again.
 - **Reclaim interval:** from confirmation of the new instance
   until its RECLAIM_COMPLETE.  Bounded by the backend's reclaim
   cap, a local policy value that every backend MUST have.  The
-  cap is measured from confirmation.  Until it is reached,
+  cap is measured from the confirmation that began the interval,
+  and a later restart does not start it over (D10).  Until it is
+  reached,
   retained state not yet reclaimed is kept as long as the new
   instance's lease is renewed.
 - **What a limit does.**  When either limit is reached, the
@@ -442,6 +444,24 @@ backend retains both instance 2's state and the unreclaimed
 remainder from instance 1.  RECLAIM_COMPLETE from any later
 instance releases everything not yet reclaimed.
 
+Each piece of retained state keeps the reclaim-cap clock (D3)
+started by the first confirmation after it was retained.  A
+later confirmation does not restart that clock.
+
+- The remainder from instance 1 was retained when instance 2 was
+  confirmed.  It stops blocking one reclaim cap after that
+  confirmation, however many times the gateway restarts
+  afterward.
+- State instance 2 held, whether it reclaimed that state or
+  acquired it new, is retained when instance 3 is confirmed.
+  Its clock starts then.
+
+Why: if every confirmation restarted the clock, a gateway that
+crashes in a loop would block direct clients without bound with
+state it never reclaims.  State the gateway does reclaim after
+each restart is held legitimately each time (D3), so a fresh
+clock for it costs direct clients nothing they were owed.
+
 ### D11. Who may ask for retention
 
 **Proposal.**  Echoing `RETAIN_STATE` is a backend policy
@@ -598,6 +618,30 @@ The common case: G reboots in less than L.
 - Step 8 returns `RETAIN_STATE` without `RECLAIMABLE_R`.
 - G still sends `SM_NOTIFY` (D8).  It sends `RECLAIM_COMPLETE`
   at once and denies C's reclaim.
+
+**Second restart during the reclaim interval**
+
+Add a second NFSv3 client, C2, that took a lock through G before
+step 5 and is down throughout, so its lock is never reclaimed.
+"Cap" is B's reclaim cap.
+
+- Steps 8 through 14 run as written.  Step 9 happens at time T2.
+  C's open and lock are reclaimed.  C2's open and lock remain
+  retained, with a cap clock that started at T2.
+- G crashes again before step 15, so instance 2 sends no
+  `RECLAIM_COMPLETE`.  When its lease expires, B keeps C's open
+  and lock as well.
+- G returns as instance 3: `EXCHANGE_ID(verifier=v3)`, then
+  `CREATE_SESSION` at time T3.  C's open and lock are retained
+  with a clock that starts at T3.  The clock for C2's open and
+  lock still runs from T2 (D10).
+- G notifies again, and C reclaims again as in steps 11 through
+  14.
+- At T2 plus the cap, C2's open and lock stop blocking.  D's
+  conflicting `LOCK` can now be granted, and B revokes them
+  when it grants it.
+- Front-side grace ends.  G sends `RECLAIM_COMPLETE`, and B
+  releases whatever is still retained.
 
 Writing this out forced D3, D5, and D6.  None of the three was
 settled by the outline.
@@ -758,18 +802,7 @@ gateway and backend behavior with no new wire elements.
 10. **NFS4ERR_GRACE without a visible restart** (Section 6).
     Unverified that NFSv4 gateway clients tolerate it from a
     gateway they did not see restart.
-11. **The reclaim cap across repeated restarts** (D3, D10).  D3
-    measures the cap from confirmation, and D10 lets retained
-    state accumulate across instances.  Nothing says which
-    confirmation starts the clock for the remainder left by
-    instance 1 once instance 3 is confirmed.  If every
-    confirmation restarts it, a gateway that crashes in a loop
-    blocks direct clients without bound, the outcome D3 rejected
-    when it refused to pause the cap.  Candidate rule: each
-    piece of retained state keeps the clock started by the first
-    confirmation after it was retained.  Section 4 also has no
-    worked sequence for a second restart.
-12. **NFS4ERR_RECLAIM_CONFLICT** (D5).  The outline lists it and
+11. **NFS4ERR_RECLAIM_CONFLICT** (D5).  The outline lists it and
     no decision here uses it.  D5 answers a failed reclaim with
     NFS4ERR_RECLAIM_BAD or NFS4ERR_NO_GRACE.  The one case it
     might fit is state kept past a limit and then revoked for a
