@@ -94,9 +94,11 @@ Short; refers to the problem statement for the full analysis.
   meaning of the new flag bits, because RFC 8178 Section 5 says
   changes outside the XDR extension framework, behavioral
   changes among them (Section 5.2), "can only be made in a new
-  minor version".  Precedent for flag bits that alter an
-  existing operation, published as an NFSv4.2 extension: the
-  OPEN share_access flags of RFC 9754.
+  minor version".  Precedent, published as an NFSv4.2 extension
+  under RFC 8178: the OPEN share_access flags of RFC 9754, which
+  change required behavior in OPEN, CB_GETATTR, and SETATTR.
+  Limit of the precedent: those flags act on one open or
+  delegation and take nothing away from other clients.
 - Behavior the flags select, in each case only for a client ID
   established with the echoed flag:
   - EXCHANGE_ID and CREATE_SESSION, client restart case: state

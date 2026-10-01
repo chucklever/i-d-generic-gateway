@@ -830,12 +830,27 @@ gateway and backend behavior with no new wire elements.
     attaches to them different behavior for lease expiry, client
     restart, reclaim outside grace, the RECLAIM_COMPLETE gate,
     and a stable-storage record.  The draft's position is that
-    all of it is the defined meaning of the new bits.  RFC 9754
-    is precedent for new flag bits that alter an existing
-    operation within NFSv4.2, but its bits are in OPEN and
-    change OPEN.  Here bits in EXCHANGE_ID change operations
-    whose own XDR is untouched.  The working group may read that
-    as a Section 5 change.  D6 is the most exposed part.
+    all of it is the defined meaning of the new bits.
+
+    RFC 9754 is precedent, read in full for this pass.  It
+    extends NFSv4.2 "using the process detailed in [RFC8178]"
+    and cites RFC 8178 Section 4.4.2 as what lets it avoid a new
+    minor version.  Its two OPEN share_access flag bits change
+    more than the XDR.  With WANT_OPEN_XOR_DELEGATION, OPEN may
+    return no open stateid.  With WANT_DELEG_TIMESTAMPS, the
+    server "MUST query the client via a CB_GETATTR" and MUST
+    accept or delay a SETATTR of the delegated times, so a flag
+    carried in OPEN changes required behavior in operations
+    whose own XDR is untouched.  That is the pattern this design
+    follows.
+
+    Where the precedent stops: RFC 9754's flags act on one open
+    or delegation, and they take nothing away from other
+    clients.  This design's flags act on a whole
+    client ID, set aside requirements of RFC 8881 that protect
+    other clients (Section 8.4.3), and change what those clients
+    see, since they are denied for longer.  The working group may read that as a
+    Section 5 change.  D6 is the most exposed part.
 
 ## 8. Where This Lands in the Outline
 
