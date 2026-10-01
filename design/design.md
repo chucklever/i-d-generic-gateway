@@ -96,9 +96,17 @@ These are the rules the extension changes or builds on.
 - **Unknown EXCHANGE_ID flags are rejected.**  "Bits not defined
   above cannot be set in the eia_flags field.  If they are, the
   server MUST reject the operation with NFS4ERR_INVAL" (Section
-  18.35.3).  Bits in use: 0x1, 0x2, 0x100, 0x10000 through
-  0x40000, 0x40000000, 0x80000000 in RFC 8881, plus 0x4 from
-  RFC 8435 (from memory, not rechecked).
+  18.35.3).  Bits in use: 0x1, 0x2, 0x100, 0x10000, 0x20000,
+  0x40000, 0x40000000, and 0x80000000 in RFC 8881 (Section
+  18.35.1), plus 0x4, EXCHGID4_FLAG_SUPP_FENCE_OPS, from RFC
+  7862 (Section 14.1).
+- **Fencing delays the reply to a restarted client.**  When
+  EXCHGID4_FLAG_SUPP_FENCE_OPS is in effect, the server does not
+  reply to an EXCHANGE_ID "on the same client owner with a new
+  verifier until all operations in progress on the client ID's
+  session are completed or aborted" (RFC 7862 Section 14.1.4).  That is the EXCHANGE_ID a
+  returning gateway sends, and the extension leaves the rule in
+  place.
 
 ## 3. Decisions
 
