@@ -150,9 +150,23 @@ The authoritative answer is the result of each reclaim.  The
 gateway uses the hint to decide whether to run a front-side
 grace period at all (D8).
 
-Rejected: a new operation.  It would carry more (for example the
-absence limit) but adds an operation number and XDR for
-information the gateway does not need in advance (D3).
+RFC 8178 Section 4.4.3 qualifies that signal: NFS4ERR_INVAL
+shows a flag bit is unknown only if the requester avoids the
+other conditions under which the operation returns that error.
+EXCHANGE_ID has such conditions.  The retry settles it: if the
+same request succeeds without the flag, the flag was the cause.
+
+Rejected:
+- A new operation.  It would carry more (for example the
+  absence limit) but adds an operation number and XDR for
+  information the gateway does not need in advance (D3).
+- A new attribute that advertises support.  RFC 8178 Section 6
+  offers this as a convenience, and RFC 9754 uses it
+  (fattr4_open_arguments) for its OPEN flags.  An attribute is
+  read per file system, with a filehandle.  Retention is a
+  property of a client ID, and the gateway has to learn of it
+  at EXCHANGE_ID, before it has a session.  A reviewer may still
+  ask for one, so the draft should give this reason.
 
 ### D2. What is retained
 
@@ -376,6 +390,17 @@ Path forward, to be noted in the draft: a gateway may grant a
 front-side delegation only while it holds a back-side delegation
 on the same file from a backend that supports
 CLAIM_DELEGATE_PREV.
+
+The prohibition covers front-side grants only.  A gateway may
+hold back-side delegations for its own use.  RFC 9754 Section
+5.1 describes that arrangement: an NFSv3 server that is an
+NFSv4.2 client and holds delegations so it can answer attribute
+queries without a GETATTR to the backend.  This extension does
+not retain those delegations (D2), so a gateway restart loses
+them.  **Unverified:** that the loss costs only performance when
+the delegation carries timestamps under RFC 9754.  The gateway
+is then the authority for the access and modify times, and
+passes them back at DELEGRETURN.
 
 ### D8. What the gateway tells its clients
 

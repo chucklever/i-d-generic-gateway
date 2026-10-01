@@ -144,7 +144,12 @@ Short; refers to the problem statement for the full analysis.
   server that declines clears the flag in the result and behaves
   per RFC 8881.
 - A server without the extension returns NFS4ERR_INVAL; the
-  client retries without the flag.
+  client retries without the flag, which also separates an
+  unknown flag from the other causes of that error (RFC 8178
+  Section 4.4.3).
+- Why no attribute advertises support (RFC 8178 Section 6, RFC
+  9754): retention belongs to a client ID and is learned at
+  EXCHANGE_ID, and an attribute is read per file system.
 
 ### 6.2. Retained State (D2)
 
@@ -302,6 +307,8 @@ Short; refers to the problem statement for the full analysis.
 - NFSv4.0 clients (no RECLAIM_COMPLETE).
 - Delegations: a gateway MUST NOT grant them on the strength of
   this extension.  Path forward through CLAIM_DELEGATE_PREV (D7).
+- Back-side delegations the gateway holds for its own use (RFC
+  9754 Section 5.1) are allowed and are not retained.
 
 ### 7.7. Backend Restart
 

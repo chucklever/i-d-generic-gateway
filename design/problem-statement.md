@@ -232,8 +232,14 @@ ordinary two-party case and raises nothing new.
 ### 7.3. Delegations
 
 - A gateway may hold a back-side delegation for its own caching,
-  with no front-side delegation.  Losing it on gateway restart
-  costs performance only.
+  with no front-side delegation.  RFC 9754 Section 5.1 gives
+  this as a use case: an NFSv3 server that is an NFSv4.2 client
+  holds delegations so it can serve attributes without asking
+  the backend.  Losing the delegation on gateway restart costs
+  performance only.  TODO: check that claim for a delegation
+  that carries timestamps (RFC 9754 Section 5), where the
+  gateway is the authority for the access and modify times
+  until it returns the delegation.
 - A gateway may grant front-side delegations.  That is safe only
   while the gateway holds a back-side delegation covering the
   same file, since otherwise the backend may grant conflicting
