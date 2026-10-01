@@ -262,6 +262,10 @@ would need a new operation.
   was acquired under (same open-owner string, same file).
 - No match: NFS4ERR_RECLAIM_BAD.  Nothing retained any longer:
   NFS4ERR_NO_GRACE.
+- State revoked for a conflicting request after a limit (D3) is
+  no longer retained, so one of those two errors answers a
+  reclaim for it.  NFS4ERR_RECLAIM_CONFLICT is not used: to
+  return it, the backend would have to remember what it revoked.
 
 A reclaimed lock keeps its original association with a
 lock-owner, an open-owner, and a file.  The new instance
@@ -802,13 +806,6 @@ gateway and backend behavior with no new wire elements.
 10. **NFS4ERR_GRACE without a visible restart** (Section 6).
     Unverified that NFSv4 gateway clients tolerate it from a
     gateway they did not see restart.
-11. **NFS4ERR_RECLAIM_CONFLICT** (D5).  The outline lists it and
-    no decision here uses it.  D5 answers a failed reclaim with
-    NFS4ERR_RECLAIM_BAD or NFS4ERR_NO_GRACE.  The one case it
-    might fit is state kept past a limit and then revoked for a
-    conflicting request (D3), but returning it there requires
-    the backend to remember what it revoked.  Either give it
-    that use or drop it from the outline.
 
 ## 8. Where This Lands in the Outline
 
