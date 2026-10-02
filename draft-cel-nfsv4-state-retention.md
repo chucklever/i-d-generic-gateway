@@ -839,17 +839,350 @@ gateway and the server is therefore best effort, and safety is
 not.
 
 
-# Gateway Server Behavior
+# Gateway Server Behavior {#gateway}
 
-TODO Gateway Server Behavior
+This section specifies how a gateway uses the extension.  The
+requirements here are on the gateway, in both of its roles.
+{{extension}} places no requirement on a gateway beyond those of
+any retaining client.
+
+## What Is Recoverable {#recoverable}
+
+Retention preserves what the backend holds and nothing else.  A
+front-side reclaim can succeed with its protection intact only if
+the backend's conflict protection for the corresponding derived
+state remained in force from the original grant until the new
+instance of the gateway recovered it.  Front-side state that has
+no derived counterpart cannot meet that condition.  A gateway is
+free today to enforce some front-side state in its own tables
+without creating derived state for it, and for such state a
+gateway restart leaves the guarantee exactly as weak as it was
+before: the gateway re-grants the state during its own grace
+period, and the backend is not involved.
+
+Share deny modes are the known case.  A gateway handles them in
+one of two modes, and the choice belongs to the implementer.
+
+Pass-through:
+: The derived open carries at least the share deny bits of the
+  front-side open or NLM_SHARE it stands for.  The backend
+  enforces those bits against direct clients, retains them with
+  the open, and matches them on reclaim.  A front-side deny mode
+  recovered in this mode has been protected throughout.
+
+Local-only:
+: The derived open carries no share deny bits.  The gateway
+  enforces the front-side deny mode in its own tables.  The deny
+  mode binds front-side clients only, before and after a restart,
+  and a front-side reclaim is re-granted from the gateway's own
+  grace-period arbitration.  This document does not count that as
+  recovered share exclusion.
+
+A gateway that implements neither mode MAY refuse a front-side
+request that carries a deny mode.
+
+Only pass-through protects a front-side client against direct
+clients.  A front-side client has no way to learn which mode it
+was given, because neither NFSv4 nor NLM_SHARE can signal it, so
+an operator who needs share exclusion against direct clients has
+to know which mode the gateway runs.
+
+A gateway's deny mode MUST NOT change across a restart of the
+gateway.  A gateway that was local-only before a restart and
+pass-through after it would send a reclaim OPEN with deny bits
+that the retained open lacks, and the backend would answer
+NFS4ERR_RECLAIM_BAD ({{reclaim}}).  The mode is therefore
+persistent configuration ({{stable}}).  A gateway whose mode has
+nonetheless changed retries the reclaim without deny bits and
+treats the result as local-only.
+
+Pass-through requires one back-side open-owner per front-side
+owner ({{owners}}).  A deny mode conflicts with opens by other
+open-owners, including other open-owners under the same client
+ID, so with that mapping the backend arbitrates deny modes among
+the gateway's front-side clients as well as against direct
+clients.  A gateway that
+aggregates many front-side owners under one back-side open-owner
+is local-only for conflicts among its own clients, whatever bits
+it sends, and after a restart it cannot rely on owner matching to
+tell their opens apart.
+
+Opens and locks that a gateway services locally under a back-side
+delegation are a second case of state with no derived counterpart.
+{{gateway-nfsv4}} specifies how a gateway avoids it.
 
 ## Owner Derivation {#owners}
 
-TODO Owner Derivation
+The matching rule in {{reclaim}} requires the new instance of a
+gateway to present the same open-owner and lock-owner strings that
+the prior instance used.  The gateway has no record of those
+strings after a restart other than what it can reconstruct from
+the reclaim request itself, so a gateway MUST derive each
+back-side owner string deterministically from values that a
+front-side reclaim request supplies.  The backend treats owner
+strings as opaque, so this document requires determinism and
+recommends a construction without mandating one.
+
+For an NLM front-side client, the gateway derives the back-side
+lock-owner from the NLM caller name and the NLM owner handle.
+NLM has no opens, so the gateway also derives a synthetic
+open-owner from the same two values and holds one back-side open
+per synthetic open-owner and file.  All of that NLM owner's locks
+on the file are taken under that open, and the gateway closes the
+open when the last of them is released.  The synthetic open has
+to be reclaimable from an NLM reclaim request alone, which
+supplies the file handle, the caller name, and the owner handle.
+The gateway therefore chooses the open's share access by a rule
+that needs nothing else.
+
+For an NFSv4 front-side client, the gateway derives the back-side
+owner from the front-side client owner string and the front-side
+open-owner or lock-owner.
+
+Before it forwards a reclaim, a gateway MUST check the reclaiming
+front-side client against whatever identity the front-side
+protocol authenticates, and the derived owner MUST be built from
+values tied to that identity.  For NFSv4, a reclaim arrives under
+a front-side client ID.  The gateway accepts it only from a client
+owner in its record of clients permitted to reclaim ({{stable}}),
+and only under the principal that {{RFC8881}} requires for that
+client owner.  The derived owner includes the front-side client
+owner string, so it is bound to that check without carrying the
+principal itself.  For NLM, the caller name and owner handle are
+supplied in the request and nothing in NLM authenticates them.
+The gateway accepts a reclaim only for a caller in its NSM monitor
+list.  It MAY also record the RPC credential or the source address
+with that entry and require a match.  With RPCSEC_GSS that is a
+binding to an authenticated identity.  With AUTH_SYS it is not.
+
+On a front side that NLM does not authenticate, a host that can
+reach the gateway and present another client's caller name and
+owner handle during the gateway's grace period can reclaim that
+client's lock.  The same is true of any NLM server, so the gateway
+adds no exposure that NLM did not already have, but owner matching
+on the backend does not remove it either.  {{security}} discusses
+this further.
+
+Each front-side component of an owner can be up to 1024 bytes
+long, and so can the back-side owner string, so the construction
+needs a hash.  A collision between two front-side owners makes
+them share back-side state: the backend treats their opens and
+locks as belonging to one owner, so a conflict between them is
+not detected and a reclaim by one can recover state of the other.
+A gateway SHOULD use a hash whose output length makes an
+accidental collision negligible.
+
+## Stable Storage {#stable}
+
+A gateway keeps the following in stable storage, in addition to
+whatever its front-side and back-side implementations already
+require:
+
+- the back-side client owner string, so that each instance of the
+  gateway presents the same client owner to the backend;
+
+- the record of front-side clients permitted to reclaim, which is
+  the NFSv4 client list that {{Section 8.4.3 of RFC8881}}
+  requires of any NFSv4 server, and the NSM monitor list that NLM
+  requires of any NLM server, optionally with the RPC credential
+  or source address of each NLM caller ({{owners}}); and
+
+- the deny mode in use, pass-through or local-only
+  ({{recoverable}}).
 
 ## Restart Sequence {#gateway-reclaim}
 
-TODO Restart Sequence
+When a gateway starts after a restart, it proceeds in this order:
+
+1. The gateway sends EXCHANGE_ID with EXCHGID4_FLAG_RETAIN_STATE
+   to the backend, then CREATE_SESSION.
+
+2. The gateway begins its front-side grace period and notifies
+   its front-side clients: SM_NOTIFY to the callers in its NSM
+   monitor list, and the ordinary NFSv4 restart indications to its
+   NFSv4 clients.
+
+3. The gateway forwards each front-side reclaim to the backend as
+   a back-side reclaim and answers the front-side client from the
+   backend's reply.
+
+4. When the front-side grace period ends, the gateway sends
+   RECLAIM_COMPLETE to the backend.
+
+The gateway decides once, from the EXCHANGE_ID reply, whether
+reclaims can succeed, and then the backend decides each reclaim.
+
+If the reply carries EXCHGID4_FLAG_RECLAIMABLE_R, the gateway runs
+the sequence above in full.  The gateway MUST grant a front-side
+reclaim only if the corresponding back-side reclaim succeeded, and
+MUST refuse a front-side reclaim whose back-side reclaim failed.
+The gateway does not need to know whether the backend answered
+from retained state or from its own grace period, because the
+requests are the same in both cases ({{reclaim}}).  The gateway
+withholds RECLAIM_COMPLETE until its front-side grace period ends.
+
+If the reply does not carry EXCHGID4_FLAG_RECLAIMABLE_R, the
+gateway still notifies its front-side clients, sends
+RECLAIM_COMPLETE at once, and refuses every front-side reclaim.
+This covers a return after the retained state was released, and a
+backend that restarted and has either left its grace period or
+has no record of this client owner.  A gateway treats a backend
+that does not implement the extension, detected by NFS4ERR_INVAL
+and the retry without the flag, or that declines retention, in the
+same way.  The gateway notifies in every case because a refused
+reclaim is the only way an NLM client learns that a lock is gone.
+
+## NFSv3 Front-Side Clients {#gateway-nfsv3}
+
+An NFSv3 client learns of the gateway's restart from SM_NOTIFY and
+reclaims each lock with an NLM_LOCK request that has the reclaim
+field set.  The gateway maps that request to a back-side OPEN with
+CLAIM_PREVIOUS for the synthetic open-owner derived from the
+request, followed by a LOCK with the reclaim field set under the
+reclaimed open ({{owners}}).  If both succeed, the gateway grants
+the NLM reclaim.  If either fails, the gateway denies it.
+
+An NLM_SHARE request carries a deny mode.  The gateway handles it
+in the deny mode it runs ({{recoverable}}).  In pass-through mode,
+the derived open carries the deny bits and is reclaimed with them.
+In local-only mode, the gateway re-grants the share from its own
+tables during its grace period.
+
+NLM does not gate READ and WRITE on recovery, so NFSv3 I/O
+continues to arrive during the gateway's grace period.  The
+gateway serves it either by opening the file on the backend with
+a non-reclaim OPEN, which {{before-complete}} permits before
+RECLAIM_COMPLETE, or with a special stateid.
+
+## NFSv4 Front-Side Clients {#gateway-nfsv4}
+
+An NFSv4 client learns of the gateway's restart from
+NFS4ERR_BADSESSION or NFS4ERR_STALE_CLIENTID, as it would from any
+server, and reclaims during the gateway's grace period.  The
+gateway maps a front-side OPEN with CLAIM_PREVIOUS to a back-side
+OPEN with CLAIM_PREVIOUS under the derived open-owner, and a
+front-side lock reclaim to a back-side LOCK with the reclaim field
+set under the reclaimed open, as for NLM.  Share deny modes
+survive the restart if the gateway passed them through.
+
+The gateway sends the back-side RECLAIM_COMPLETE when every
+front-side client in the gateway's record of clients permitted to
+reclaim has sent its own RECLAIM_COMPLETE, or when the front-side
+grace
+timer ends, whichever comes first.  NFSv4.0 clients have no
+RECLAIM_COMPLETE, so for a gateway that serves them the timer
+governs.
+
+A gateway MUST NOT grant a delegation to a front-side client on
+the strength of this extension.  A front-side client holding a
+write delegation has opens and locks that neither the gateway nor
+the backend knows about.  After a gateway restart, that delegation
+can be honored only if the backend guaranteed that no conflicting
+access occurred in the interim, which requires a back-side
+delegation retained under CLAIM_DELEGATE_PREV ({{Section 10.2.1
+of RFC8881}}).  A future document may permit a gateway to grant a
+front-side delegation on that condition.
+
+The prohibition covers front-side grants only.  A gateway MAY hold
+back-side delegations for its own use, in the arrangement that
+{{Section 5.1 of RFC9754}} describes for an NFSv3 server that is
+an NFSv4.2 client.  This extension does not retain those
+delegations ({{retain}}), so a gateway restart loses them.
+
+{{Section 10.4.2 of RFC8881}} has a client that holds a write
+delegation perform lock operations locally.  A gateway that did
+so with its front-side clients' locks would create no derived
+state for them: the delegation would be their only protection at
+the backend, and the delegation is not retained.  After a restart
+there would be nothing to reclaim, and direct clients would have
+been free to take conflicting locks once the delegation was gone.
+A gateway that uses this extension MUST therefore create derived
+opens and locks at the backend for its front-side clients' opens
+and locks even while it holds a delegation on the file.
+
+A gateway that holds a back-side delegation with delegated
+timestamps ({{Section 5 of RFC9754}}) is the authority for the
+file's access and modify times until it returns the delegation,
+and a restart loses the values only the gateway held.  Access
+times for reads the gateway served from its cache are lost.
+Modify times the gateway reported to front-side clients for data
+the gateway had
+already written may differ from the backend's own modify time for
+those writes, so that after the restart front-side clients see
+the modify time change with no other writer, and an NFSv3 client
+treats that as a changed file and drops its cached data.  No data
+is lost in either case.  A time that a front-side client set
+explicitly with a SETATTR is different: if the gateway absorbed it
+under the delegation and then restarted, the time is lost although
+the gateway acknowledged it, and an NFSv3 server is required to
+recover without data loss ({{Section 4.8 of RFC1813}}).  A
+gateway MUST send an explicit time
+change to the backend before it replies to the front-side client
+that requested it.
+
+## Backend Restart {#gateway-backend-restart}
+
+When the backend restarts and the gateway does not, the gateway
+holds all of its derived state in memory and reclaims it during
+the backend's grace period as any NFSv4 client does.  Front-side
+clients are not notified.  During the backend's grace period, the
+backend returns NFS4ERR_GRACE for new locking requests and for
+I/O, and the gateway maps that to what each front-side protocol
+can express: NLM4_DENIED_GRACE_PERIOD for NLM, NFS3ERR_JUKEBOX for
+NFSv3 I/O, and NFS4ERR_GRACE for NFSv4.  If the gateway cannot
+reclaim some derived state, for example because it was partitioned
+from the backend through the backend's grace period, the
+front-side state that derived state stood for is no longer
+protected, and the gateway reports the loss as {{lost}} describes.
+
+When both the gateway and the backend restart, the backend is in
+its ordinary grace period and holds no retained state.  It sets
+EXCHGID4_FLAG_RECLAIMABLE_R if it is in its grace period and has
+the gateway's client owner on record, so the gateway follows the
+sequence in {{gateway-reclaim}} and forwards front-side reclaims,
+which the backend treats as ordinary reclaims.  If the backend's
+grace period ended before the gateway returned, the flag is clear
+and the gateway refuses every reclaim.  If the backend's grace
+period ends while the gateway is still forwarding reclaims, the
+remaining back-side reclaims fail with NFS4ERR_NO_GRACE and the
+gateway refuses the corresponding front-side reclaims.
+Continuity in this case therefore depends on the backend's grace
+period outlasting the gateway's, which {{grace}} recommends but
+{{RFC8881}} does not promise.  The safety rule of
+{{gateway-reclaim}} holds regardless: nothing is re-granted on the
+front side without a successful back-side reclaim.
+
+When the backend restarts during the gateway's reclaim interval,
+the gateway has not restarted again.  It observes the backend
+restart, establishes a new client ID, and reclaims the derived
+state it has already recovered as any client does.  Front-side
+reclaims still arriving are forwarded as ordinary reclaims.  The
+gateway sends RECLAIM_COMPLETE to the new backend instance when
+the gateway's front-side grace period ends.  The same safety rule decides
+each reclaim.
+
+## Reporting Lost State {#lost}
+
+A front-side client's state is lost when the backend released or
+revoked the corresponding derived state after the absence limit
+or the reclaim cap was reached, when an administrator released it,
+when a back-side reclaim was refused, or when the gateway's lease
+on the backend expired during a partition and the backend revoked
+the state.  In the last case the front-side clients renewed their
+own leases with the gateway throughout and did nothing wrong, yet
+their state is gone.
+
+To an NFSv4 front-side client, the gateway reports the loss with
+the mechanisms {{Section 8.4.3 of RFC8881}} provides: the
+affected stateids are revoked, and the SEQ4_STATUS flags in the
+next SEQUENCE reply tell the client that some of its state has
+been revoked.
+
+To an NLM client, the gateway has no way to report a loss other
+than to deny the client's reclaim after SM_NOTIFY.  NLM provides
+no notification for a lock lost while the client was not
+reclaiming.  This is a limitation of NLM, which this document
+records and does not fix.
 
 
 # Backend Server Behavior
