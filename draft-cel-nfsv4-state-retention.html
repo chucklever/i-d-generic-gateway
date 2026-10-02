@@ -1205,6 +1205,9 @@ permit the new instance of that client to reclaim that state.<a href="#section-a
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.1">
                 <p id="section-toc.1-1.6.2.1.1"><a href="#section-6.1" class="auto internal xref">6.1</a>.  <a href="#name-owner-derivation" class="internal xref">Owner Derivation</a></p>
 </li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.2">
+                <p id="section-toc.1-1.6.2.2.1"><a href="#section-6.2" class="auto internal xref">6.2</a>.  <a href="#name-restart-sequence" class="internal xref">Restart Sequence</a></p>
+</li>
             </ul>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7">
@@ -1939,7 +1942,38 @@ gateway's back-side client performs I/O.<a href="#section-5.5-5" class="pilcrow"
         <h3 id="name-completing-reclaim">
 <a href="#section-5.6" class="section-number selfRef">5.6. </a><a href="#name-completing-reclaim" class="section-name selfRef">Completing Reclaim</a>
         </h3>
-<p id="section-5.6-1">TODO Completing Reclaim<a href="#section-5.6-1" class="pilcrow">¶</a></p>
+<p id="section-5.6-1">A new instance of a retaining client signals that it has finished
+reclaiming by sending RECLAIM_COMPLETE with rca_one_fs set to
+FALSE, as any client does at the end of its reclaims
+(<span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.51" class="relref">Section 18.51</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  This extension defines no
+separate completion operation.<a href="#section-5.6-1" class="pilcrow">¶</a></p>
+<p id="section-5.6-2">When a server receives that RECLAIM_COMPLETE from a retaining
+client, it <span class="bcp14">MUST</span> release all retained state of that client owner
+that has not been reclaimed.  The release ends the reclaim
+interval.  State the instance reclaimed before sending
+RECLAIM_COMPLETE is unaffected: it is ordinary state of a live
+client and remains so.  Retained state released here is state
+whose lease expired without being reclaimed, so this is the point
+at which the server makes the stable-storage record that
+<a href="#retain" class="auto internal xref">Section 5.2</a> defers from lease expiry.<a href="#section-5.6-2" class="pilcrow">¶</a></p>
+<p id="section-5.6-3">A RECLAIM_COMPLETE with rca_one_fs set to TRUE pertains to a file
+system transition and has no effect on retained state.<a href="#section-5.6-3" class="pilcrow">¶</a></p>
+<p id="section-5.6-4">Once released, retained state cannot be reclaimed.  A reclaim-type
+request that arrives after RECLAIM_COMPLETE finds no retained
+state for the client owner and receives NFS4ERR_NO_GRACE, as
+<a href="#reclaim" class="auto internal xref">Section 5.4</a> specifies.  A gateway whose front-side grace period
+has ended has nothing further to forward, so this case arises only
+from a reclaim that a front-side client sends late, and the
+gateway refuses it as <a href="#gateway-reclaim" class="auto internal xref">Section 6.2</a> describes.<a href="#section-5.6-4" class="pilcrow">¶</a></p>
+<p id="section-5.6-5">RECLAIM_COMPLETE from any instance of the client owner releases
+everything retained and not yet reclaimed, including the remainder
+from an earlier instance that restarted before sending its own
+RECLAIM_COMPLETE.  <a href="#retain" class="auto internal xref">Section 5.2</a> describes how retained state
+accumulates across repeated restarts and how the reclaim cap
+bounds each part of it.<a href="#section-5.6-5" class="pilcrow">¶</a></p>
+<p id="section-5.6-6">A new instance that learns from the EXCHANGE_ID reply that no
+reclaim can succeed, because EXCHGID4_FLAG_RECLAIMABLE_R is
+clear, sends RECLAIM_COMPLETE at once, as <span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.51.3" class="relref">Section 18.51.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> requires of a client that has nothing to reclaim.<a href="#section-5.6-6" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="errors">
@@ -1972,6 +2006,14 @@ gateway's back-side client performs I/O.<a href="#section-5.5-5" class="pilcrow"
 <a href="#section-6.1" class="section-number selfRef">6.1. </a><a href="#name-owner-derivation" class="section-name selfRef">Owner Derivation</a>
         </h3>
 <p id="section-6.1-1">TODO Owner Derivation<a href="#section-6.1-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="gateway-reclaim">
+<section id="section-6.2">
+        <h3 id="name-restart-sequence">
+<a href="#section-6.2" class="section-number selfRef">6.2. </a><a href="#name-restart-sequence" class="section-name selfRef">Restart Sequence</a>
+        </h3>
+<p id="section-6.2-1">TODO Restart Sequence<a href="#section-6.2-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
