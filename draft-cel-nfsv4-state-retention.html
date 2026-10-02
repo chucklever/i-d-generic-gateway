@@ -4,16 +4,24 @@
 <meta charset="utf-8">
 <meta content="Common,Latin" name="scripts">
 <meta content="initial-scale=1.0" name="viewport">
-<title>TODO - Your title</title>
-<meta content="Your Name Here" name="author">
+<title>State Retention Across Client Restart for NFSv4.2</title>
+<meta content="Charles Lever" name="author">
 <meta content="
-       TODO Abstract 
+       An NFS gateway is an NFS server that exports a file system that is
+itself an NFS mount of a backend server.  When the gateway
+restarts, the backend server releases the file open and lock state
+the gateway established there, even though the gateway's clients
+are still running and will attempt to recover that state.  This
+document extends NFSv4.2 so that a server can retain the state of
+a client that has restarted and permit the new instance of that
+client to reclaim it. 
     " name="description">
 <meta content="xml2rfc 3.34.1" name="generator">
-<meta content="next generation" name="keyword">
-<meta content="unicorn" name="keyword">
-<meta content="AI-native" name="keyword">
-<meta content="draft-todo-yourname-protocol-latest" name="ietf.draft">
+<meta content="NFSv4.2" name="keyword">
+<meta content="client restart" name="keyword">
+<meta content="state reclaim" name="keyword">
+<meta content="NFS gateway" name="keyword">
+<meta content="draft-cel-nfsv4-state-retention-latest" name="ietf.draft">
 <!-- Generator version information:
   xml2rfc 3.34.1
     Python 3.14.7
@@ -29,7 +37,7 @@
     requests 2.33.1
     wcwidth 0.8.4
 -->
-<link href="draft-todo-yourname-protocol.xml" rel="alternate" type="application/rfc+xml">
+<link href="draft-cel-nfsv4-state-retention.xml" rel="alternate" type="application/rfc+xml">
 <link href="#copyright" rel="license">
 <style type="text/css">@font-face {
   font-family: 'Lora';
@@ -1042,12 +1050,12 @@ svg {
 <table class="ears">
 <thead><tr>
 <td class="left">Internet-Draft</td>
-<td class="center">TODO - Abbreviation</td>
+<td class="center">NFSv4.2 State Retention</td>
 <td class="right">October 2026</td>
 </tr></thead>
 <tfoot><tr>
-<td class="left">Here</td>
-<td class="center">Expires 4 April 2027</td>
+<td class="left">Lever</td>
+<td class="center">Expires 5 April 2027</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1055,30 +1063,36 @@ svg {
 <div id="internal-metadata" class="document-information">
 <dl id="identifiers">
 <dt class="label-workgroup">Workgroup:</dt>
-<dd class="workgroup">WG Working Group</dd>
+<dd class="workgroup">Network File System Version 4</dd>
 <dt class="label-internet-draft">Internet-Draft:</dt>
-<dd class="internet-draft">draft-todo-yourname-protocol-latest</dd>
+<dd class="internet-draft">draft-cel-nfsv4-state-retention-latest</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2026-10-01" class="published">1 October 2026</time>
+<time datetime="2026-10-02" class="published">2 October 2026</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
-<dd class="intended-status">Informational</dd>
+<dd class="intended-status">Standards Track</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2027-04-04">4 April 2027</time></dd>
+<dd class="expires"><time datetime="2027-04-05">5 April 2027</time></dd>
 <dt class="label-authors">Author:</dt>
 <dd class="authors">
 <div class="author">
-      <div class="author-name">Y. N. Here</div>
-<div class="org">Your Organization Here</div>
+      <div class="author-name">C. Lever</div>
 </div>
 </dd>
 </dl>
 </div>
-<h1 id="title">TODO - Your title</h1>
+<h1 id="title">State Retention Across Client Restart for NFSv4.2</h1>
 <section id="section-abstract">
       <h2 id="abstract"><a href="#abstract" class="selfRef">Abstract</a></h2>
-<p id="section-abstract-1">TODO Abstract<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+<p id="section-abstract-1">An NFS gateway is an NFS server that exports a file system that is
+itself an NFS mount of a backend server.  When the gateway
+restarts, the backend server releases the file open and lock state
+the gateway established there, even though the gateway's clients
+are still running and will attempt to recover that state.  This
+document extends NFSv4.2 so that a server can retain the state of
+a client that has restarted and permit the new instance of that
+client to reclaim it.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 </section>
 <section class="note rfcEditorRemove" id="section-note.1">
       <h2 id="name-about-this-document">
@@ -1086,14 +1100,15 @@ svg {
       </h2>
 <p id="section-note.1-1">This note is to be removed before publishing as an RFC.<a href="#section-note.1-1" class="pilcrow">¶</a></p>
 <p id="section-note.1-2">
-        The latest revision of this draft can be found at <span><a href="https://example.com/LATEST">https://example.com/LATEST</a></span>.
-        Status information for this document may be found at <span><a href="https://datatracker.ietf.org/doc/draft-todo-yourname-protocol/">https://datatracker.ietf.org/doc/draft-todo-yourname-protocol/</a></span>.<a href="#section-note.1-2" class="pilcrow">¶</a></p>
+        The latest revision of this draft can be found at <span><a href="https://chucklever.github.io/i-d-state-retention/draft-cel-nfsv4-state-retention.html">https://chucklever.github.io/i-d-state-retention/draft-cel-nfsv4-state-retention.html</a></span>.
+        Status information for this document may be found at <span><a href="https://datatracker.ietf.org/doc/draft-cel-nfsv4-state-retention/">https://datatracker.ietf.org/doc/draft-cel-nfsv4-state-retention/</a></span>.<a href="#section-note.1-2" class="pilcrow">¶</a></p>
 <p id="section-note.1-3">
         Discussion of this document takes place on the
-        WG Working Group mailing list (<span><a href="mailto:WG@example.com">mailto:WG@example.com</a></span>),
-        which is archived at <span><a href="https://example.com/WG">https://example.com/WG</a></span>.<a href="#section-note.1-3" class="pilcrow">¶</a></p>
+        Network File System Version 4 Working Group mailing list (<span><a href="mailto:nfsv4@ietf.org">mailto:nfsv4@ietf.org</a></span>),
+        which is archived at <span><a href="https://mailarchive.ietf.org/arch/browse/nfsv4/">https://mailarchive.ietf.org/arch/browse/nfsv4/</a></span>.
+        Subscribe at <span><a href="https://www.ietf.org/mailman/listinfo/nfsv4/">https://www.ietf.org/mailman/listinfo/nfsv4/</a></span>.<a href="#section-note.1-3" class="pilcrow">¶</a></p>
 <p id="section-note.1-4">Source for this draft and an issue tracker can be found at
-        <span><a href="https://github.com/USER/REPO">https://github.com/USER/REPO</a></span>.<a href="#section-note.1-4" class="pilcrow">¶</a></p>
+        <span><a href="https://github.com/chucklever/i-d-state-retention">https://github.com/chucklever/i-d-state-retention</a></span>.<a href="#section-note.1-4" class="pilcrow">¶</a></p>
 </section>
 <div id="status-of-memo">
 <section id="section-boilerplate.1">
@@ -1114,7 +1129,7 @@ svg {
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 4 April 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 5 April 2027.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -1147,22 +1162,51 @@ svg {
             <p id="section-toc.1-1.1.1" class="keepWithNext"><a href="#section-1" class="auto internal xref">1</a>.  <a href="#name-introduction" class="internal xref">Introduction</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2">
-            <p id="section-toc.1-1.2.1" class="keepWithNext"><a href="#section-2" class="auto internal xref">2</a>.  <a href="#name-conventions-and-definitions" class="internal xref">Conventions and Definitions</a></p>
+            <p id="section-toc.1-1.2.1" class="keepWithNext"><a href="#section-2" class="auto internal xref">2</a>.  <a href="#name-requirements-language" class="internal xref">Requirements Language</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3">
-            <p id="section-toc.1-1.3.1" class="keepWithNext"><a href="#section-3" class="auto internal xref">3</a>.  <a href="#name-security-considerations" class="internal xref">Security Considerations</a></p>
+            <p id="section-toc.1-1.3.1" class="keepWithNext"><a href="#section-3" class="auto internal xref">3</a>.  <a href="#name-terminology" class="internal xref">Terminology</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4">
-            <p id="section-toc.1-1.4.1"><a href="#section-4" class="auto internal xref">4</a>.  <a href="#name-iana-considerations" class="internal xref">IANA Considerations</a></p>
+            <p id="section-toc.1-1.4.1"><a href="#section-4" class="auto internal xref">4</a>.  <a href="#name-problem-summary" class="internal xref">Problem Summary</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5">
-            <p id="section-toc.1-1.5.1"><a href="#section-5" class="auto internal xref">5</a>.  <a href="#name-normative-references" class="internal xref">Normative References</a></p>
+            <p id="section-toc.1-1.5.1"><a href="#section-5" class="auto internal xref">5</a>.  <a href="#name-protocol-overview" class="internal xref">Protocol Overview</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6">
-            <p id="section-toc.1-1.6.1"><a href="#appendix-A" class="auto internal xref"></a><a href="#name-acknowledgments" class="internal xref">Acknowledgments</a></p>
+            <p id="section-toc.1-1.6.1"><a href="#section-6" class="auto internal xref">6</a>.  <a href="#name-protocol-extension" class="internal xref">Protocol Extension</a></p>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7">
-            <p id="section-toc.1-1.7.1"><a href="#appendix-B" class="auto internal xref"></a><a href="#name-authors-address" class="internal xref">Author's Address</a></p>
+            <p id="section-toc.1-1.7.1"><a href="#section-7" class="auto internal xref">7</a>.  <a href="#name-gateway-server-behavior" class="internal xref">Gateway Server Behavior</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8">
+            <p id="section-toc.1-1.8.1"><a href="#section-8" class="auto internal xref">8</a>.  <a href="#name-backend-server-behavior" class="internal xref">Backend Server Behavior</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9">
+            <p id="section-toc.1-1.9.1"><a href="#section-9" class="auto internal xref">9</a>.  <a href="#name-xdr-description" class="internal xref">XDR Description</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10">
+            <p id="section-toc.1-1.10.1"><a href="#section-10" class="auto internal xref">10</a>. <a href="#name-security-considerations" class="internal xref">Security Considerations</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11">
+            <p id="section-toc.1-1.11.1"><a href="#section-11" class="auto internal xref">11</a>. <a href="#name-iana-considerations" class="internal xref">IANA Considerations</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12">
+            <p id="section-toc.1-1.12.1"><a href="#section-12" class="auto internal xref">12</a>. <a href="#name-references" class="internal xref">References</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.1">
+                <p id="section-toc.1-1.12.2.1.1"><a href="#section-12.1" class="auto internal xref">12.1</a>.  <a href="#name-normative-references" class="internal xref">Normative References</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.2">
+                <p id="section-toc.1-1.12.2.2.1"><a href="#section-12.2" class="auto internal xref">12.2</a>.  <a href="#name-informative-references" class="internal xref">Informative References</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13">
+            <p id="section-toc.1-1.13.1"><a href="#appendix-A" class="auto internal xref"></a><a href="#name-acknowledgments" class="internal xref">Acknowledgments</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14">
+            <p id="section-toc.1-1.14.1"><a href="#appendix-B" class="auto internal xref"></a><a href="#name-authors-address" class="internal xref">Author's Address</a></p>
 </li>
         </ul>
 </nav>
@@ -1173,13 +1217,76 @@ svg {
       <h2 id="name-introduction">
 <a href="#section-1" class="section-number selfRef">1. </a><a href="#name-introduction" class="section-name selfRef">Introduction</a>
       </h2>
-<p id="section-1-1">TODO Introduction<a href="#section-1-1" class="pilcrow">¶</a></p>
+<p id="section-1-1">An NFS gateway is an NFS server that exports a file system that is
+itself an NFS mount of a backend server.  The gateway serves one
+set of clients, over any version of NFS, while it is itself an
+NFSv4.2 client of the backend.  Every file open and byte-range
+lock that a client of the gateway holds has a counterpart that the
+gateway holds on the backend, established under the gateway's own
+client ID and lease.<a href="#section-1-1" class="pilcrow">¶</a></p>
+<p id="section-1-2">NFSv4 treats a client restart as the end of that client's state.
+When a client presents a known client owner with a new verifier in
+EXCHANGE_ID and then confirms the new client ID, the server
+releases the opens and byte-range locks that the previous instance
+held (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.1" class="relref">Section 8.4.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>, <span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.35.4" class="relref">Section 18.35.4</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  For most clients this is the correct outcome.  The
+applications that held the state restarted along with the client,
+and nothing remains that could reclaim it.<a href="#section-1-2" class="pilcrow">¶</a></p>
+<p id="section-1-3">A gateway restart is different.  The gateway's clients did not
+restart.  They observe only that their server was unreachable for
+a time, and when it returns they begin state recovery: NFSv4
+clients reclaim their opens and locks during the gateway's grace
+period, and NFSv3 clients reclaim their NLM locks when the
+gateway's status monitor announces the restart.  Each of those
+reclaims can succeed only if the gateway can re-establish the
+corresponding state on the backend.  The backend, however, has
+already released that state, and it accepts reclaim-type requests
+only during its own grace period, which it did not enter because
+it did not restart (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  The gateway
+has no way to restore its clients' state, and in the interval
+since the restart the backend may have granted conflicting opens
+or locks to other clients.<a href="#section-1-3" class="pilcrow">¶</a></p>
+<p id="section-1-4">NFSv4.1 already retains one kind of state across a client restart.
+A server that supports CLAIM_DELEGATE_PREV keeps a restarted
+client's delegations for at least a lease period so that the new
+instance of the client can reclaim them (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-10.2.1" class="relref">Section 10.2.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  This document applies the same idea to opens and
+byte-range locks.  It defines client-restart state retention: a
+server that supports it and a client that has requested it agree
+that the client's opens and locks survive a restart of the client,
+and that the new instance of the client may reclaim them outside
+the server's grace period.  The client requests retention when it
+establishes its client ID.  The server retains the client's state
+when the client's lease expires or a new instance of the client
+appears.  The new instance reclaims the state using the existing
+reclaim operations, then signals that it has finished, at which
+point the server releases whatever was not reclaimed.  At each
+stage the server bounds how long retained state may block other
+clients.  <a href="#overview" class="auto internal xref">Section 5</a> describes the sequence and <a href="#extension" class="auto internal xref">Section 6</a>
+specifies it.<a href="#section-1-4" class="pilcrow">¶</a></p>
+<p id="section-1-5">The mechanism is not limited to gateways.  Any NFSv4.2 client that
+can reconstruct its open and lock state after a restart can use
+it, for example a user-space NFS proxy or an SMB server that
+exports an NFS mount.  This document presents the gateway as the
+motivating case and develops the gateway's behavior in detail.<a href="#section-1-5" class="pilcrow">¶</a></p>
+<p id="section-1-6">This document specifies the mechanism as an extension to NFSv4.2
+under the process described in <span>[<a href="#RFC8178" class="cite xref">RFC8178</a>]</span>, in the hope that it
+can be deployed without a new NFSv4 minor version.  The behavior
+it introduces applies only to client IDs that have negotiated it.
+Servers and clients that do not implement the extension are
+unaffected.<a href="#section-1-6" class="pilcrow">¶</a></p>
+<p id="section-1-7">This document is distinct from
+<span>[<a href="#I-D.haynes-nfsv4-flexfiles-v2-proxy-server" class="cite xref">I-D.haynes-nfsv4-flexfiles-v2-proxy-server</a>]</span>, which describes a
+proxy that the backend's metadata server names in pNFS layouts.
+Clients of such a proxy hold their state at the metadata server
+rather than at the proxy, so the recovery problem described here
+does not arise for them.  <a href="#problem" class="auto internal xref">Section 4</a> summarizes the gateway's
+recovery problem, including kinds of state that this document does
+not address.<a href="#section-1-7" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="conventions-and-definitions">
+<div id="requirements-language">
 <section id="section-2">
-      <h2 id="name-conventions-and-definitions">
-<a href="#section-2" class="section-number selfRef">2. </a><a href="#name-conventions-and-definitions" class="section-name selfRef">Conventions and Definitions</a>
+      <h2 id="name-requirements-language">
+<a href="#section-2" class="section-number selfRef">2. </a><a href="#name-requirements-language" class="section-name selfRef">Requirements Language</a>
       </h2>
 <p id="section-2-1">The key words "<span class="bcp14">MUST</span>", "<span class="bcp14">MUST NOT</span>", "<span class="bcp14">REQUIRED</span>", "<span class="bcp14">SHALL</span>", "<span class="bcp14">SHALL NOT</span>", "<span class="bcp14">SHOULD</span>", "<span class="bcp14">SHOULD NOT</span>", "<span class="bcp14">RECOMMENDED</span>", "<span class="bcp14">NOT RECOMMENDED</span>",
 "<span class="bcp14">MAY</span>", and "<span class="bcp14">OPTIONAL</span>" in this document are to be interpreted as
@@ -1187,37 +1294,141 @@ described in BCP 14 <span>[<a href="#RFC2119" class="cite xref">RFC2119</a>]</s
 appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="security">
+<div id="terminology">
 <section id="section-3">
-      <h2 id="name-security-considerations">
-<a href="#section-3" class="section-number selfRef">3. </a><a href="#name-security-considerations" class="section-name selfRef">Security Considerations</a>
+      <h2 id="name-terminology">
+<a href="#section-3" class="section-number selfRef">3. </a><a href="#name-terminology" class="section-name selfRef">Terminology</a>
       </h2>
-<p id="section-3-1">TODO Security<a href="#section-3-1" class="pilcrow">¶</a></p>
+<p id="section-3-1">TODO Terminology<a href="#section-3-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="problem">
+<section id="section-4">
+      <h2 id="name-problem-summary">
+<a href="#section-4" class="section-number selfRef">4. </a><a href="#name-problem-summary" class="section-name selfRef">Problem Summary</a>
+      </h2>
+<p id="section-4-1">TODO Problem Summary<a href="#section-4-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="overview">
+<section id="section-5">
+      <h2 id="name-protocol-overview">
+<a href="#section-5" class="section-number selfRef">5. </a><a href="#name-protocol-overview" class="section-name selfRef">Protocol Overview</a>
+      </h2>
+<p id="section-5-1">TODO Protocol Overview<a href="#section-5-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="extension">
+<section id="section-6">
+      <h2 id="name-protocol-extension">
+<a href="#section-6" class="section-number selfRef">6. </a><a href="#name-protocol-extension" class="section-name selfRef">Protocol Extension</a>
+      </h2>
+<p id="section-6-1">TODO Protocol Extension<a href="#section-6-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="gateway-server-behavior">
+<section id="section-7">
+      <h2 id="name-gateway-server-behavior">
+<a href="#section-7" class="section-number selfRef">7. </a><a href="#name-gateway-server-behavior" class="section-name selfRef">Gateway Server Behavior</a>
+      </h2>
+<p id="section-7-1">TODO Gateway Server Behavior<a href="#section-7-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="backend-server-behavior">
+<section id="section-8">
+      <h2 id="name-backend-server-behavior">
+<a href="#section-8" class="section-number selfRef">8. </a><a href="#name-backend-server-behavior" class="section-name selfRef">Backend Server Behavior</a>
+      </h2>
+<p id="section-8-1">TODO Backend Server Behavior<a href="#section-8-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="xdr-description">
+<section id="section-9">
+      <h2 id="name-xdr-description">
+<a href="#section-9" class="section-number selfRef">9. </a><a href="#name-xdr-description" class="section-name selfRef">XDR Description</a>
+      </h2>
+<p id="section-9-1">TODO XDR Description<a href="#section-9-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="security">
+<section id="section-10">
+      <h2 id="name-security-considerations">
+<a href="#section-10" class="section-number selfRef">10. </a><a href="#name-security-considerations" class="section-name selfRef">Security Considerations</a>
+      </h2>
+<p id="section-10-1">TODO Security<a href="#section-10-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="iana">
-<section id="section-4">
+<section id="section-11">
       <h2 id="name-iana-considerations">
-<a href="#section-4" class="section-number selfRef">4. </a><a href="#name-iana-considerations" class="section-name selfRef">IANA Considerations</a>
+<a href="#section-11" class="section-number selfRef">11. </a><a href="#name-iana-considerations" class="section-name selfRef">IANA Considerations</a>
       </h2>
-<p id="section-4-1">This document has no IANA actions.<a href="#section-4-1" class="pilcrow">¶</a></p>
+<p id="section-11-1">TODO IANA<a href="#section-11-1" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="sec-normative-references">
-<section id="section-5">
-      <h2 id="name-normative-references">
-<a href="#section-5" class="section-number selfRef">5. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
+<div id="sec-combined-references">
+<section id="section-12">
+      <h2 id="name-references">
+<a href="#section-12" class="section-number selfRef">12. </a><a href="#name-references" class="section-name selfRef">References</a>
       </h2>
+<div id="sec-normative-references">
+<section id="section-12.1">
+        <h3 id="name-normative-references">
+<a href="#section-12.1" class="section-number selfRef">12.1. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
+        </h3>
 <dl class="references">
 <dt id="RFC2119">[RFC2119]</dt>
-      <dd>
+        <dd>
 <span class="refAuthor">Bradner, S.</span>, <span class="refTitle">"Key words for use in RFCs to Indicate Requirement Levels"</span>, <span class="seriesInfo">BCP 14</span>, <span class="seriesInfo">RFC 2119</span>, <span class="seriesInfo">DOI 10.17487/RFC2119</span>, <time datetime="1997-03" class="refDate">March 1997</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc2119">https://www.rfc-editor.org/rfc/rfc2119</a>&gt;</span>. </dd>
 <dd class="break"></dd>
+<dt id="RFC7862">[RFC7862]</dt>
+        <dd>
+<span class="refAuthor">Haynes, T.</span>, <span class="refTitle">"Network File System (NFS) Version 4 Minor Version 2 Protocol"</span>, <span class="seriesInfo">RFC 7862</span>, <span class="seriesInfo">DOI 10.17487/RFC7862</span>, <time datetime="2016-11" class="refDate">November 2016</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7862">https://www.rfc-editor.org/rfc/rfc7862</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC7863">[RFC7863]</dt>
+        <dd>
+<span class="refAuthor">Haynes, T.</span>, <span class="refTitle">"Network File System (NFS) Version 4 Minor Version 2 External Data Representation Standard (XDR) Description"</span>, <span class="seriesInfo">RFC 7863</span>, <span class="seriesInfo">DOI 10.17487/RFC7863</span>, <time datetime="2016-11" class="refDate">November 2016</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7863">https://www.rfc-editor.org/rfc/rfc7863</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="RFC8174">[RFC8174]</dt>
-    <dd>
+        <dd>
 <span class="refAuthor">Leiba, B.</span>, <span class="refTitle">"Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words"</span>, <span class="seriesInfo">BCP 14</span>, <span class="seriesInfo">RFC 8174</span>, <span class="seriesInfo">DOI 10.17487/RFC8174</span>, <time datetime="2017-05" class="refDate">May 2017</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8174">https://www.rfc-editor.org/rfc/rfc8174</a>&gt;</span>. </dd>
 <dd class="break"></dd>
+<dt id="RFC8178">[RFC8178]</dt>
+        <dd>
+<span class="refAuthor">Noveck, D.</span>, <span class="refTitle">"Rules for NFSv4 Extensions and Minor Versions"</span>, <span class="seriesInfo">RFC 8178</span>, <span class="seriesInfo">DOI 10.17487/RFC8178</span>, <time datetime="2017-07" class="refDate">July 2017</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8178">https://www.rfc-editor.org/rfc/rfc8178</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8881">[RFC8881]</dt>
+      <dd>
+<span class="refAuthor">Noveck, D., Ed.</span> and <span class="refAuthor">C. Lever</span>, <span class="refTitle">"Network File System (NFS) Version 4 Minor Version 1 Protocol"</span>, <span class="seriesInfo">RFC 8881</span>, <span class="seriesInfo">DOI 10.17487/RFC8881</span>, <time datetime="2020-08" class="refDate">August 2020</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8881">https://www.rfc-editor.org/rfc/rfc8881</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 </dl>
+</section>
+</div>
+<div id="sec-informative-references">
+<section id="section-12.2">
+        <h3 id="name-informative-references">
+<a href="#section-12.2" class="section-number selfRef">12.2. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
+        </h3>
+<dl class="references">
+<dt id="I-D.haynes-nfsv4-flexfiles-v2-proxy-server">[I-D.haynes-nfsv4-flexfiles-v2-proxy-server]</dt>
+        <dd>
+<span class="refAuthor">Haynes, T.</span>, <span class="refTitle">"Proxy-Driven Server for Flexible Files Version 2"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-haynes-nfsv4-flexfiles-v2-proxy-server-04</span>, <time datetime="2026-08-07" class="refDate">7 August 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-haynes-nfsv4-flexfiles-v2-proxy-server-04">https://datatracker.ietf.org/doc/html/draft-haynes-nfsv4-flexfiles-v2-proxy-server-04</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC1813">[RFC1813]</dt>
+        <dd>
+<span class="refAuthor">Callaghan, B.</span>, <span class="refAuthor">Pawlowski, B.</span>, and <span class="refAuthor">P. Staubach</span>, <span class="refTitle">"NFS Version 3 Protocol Specification"</span>, <span class="seriesInfo">RFC 1813</span>, <span class="seriesInfo">DOI 10.17487/RFC1813</span>, <time datetime="1995-06" class="refDate">June 1995</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc1813">https://www.rfc-editor.org/rfc/rfc1813</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC7530">[RFC7530]</dt>
+        <dd>
+<span class="refAuthor">Haynes, T., Ed.</span> and <span class="refAuthor">D. Noveck, Ed.</span>, <span class="refTitle">"Network File System (NFS) Version 4 Protocol"</span>, <span class="seriesInfo">RFC 7530</span>, <span class="seriesInfo">DOI 10.17487/RFC7530</span>, <time datetime="2015-03" class="refDate">March 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7530">https://www.rfc-editor.org/rfc/rfc7530</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9754">[RFC9754]</dt>
+      <dd>
+<span class="refAuthor">Haynes, T.</span> and <span class="refAuthor">T. Myklebust</span>, <span class="refTitle">"Extensions for Opening and Delegating Files in NFSv4.2"</span>, <span class="seriesInfo">RFC 9754</span>, <span class="seriesInfo">DOI 10.17487/RFC9754</span>, <time datetime="2025-03" class="refDate">March 2025</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9754">https://www.rfc-editor.org/rfc/rfc9754</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+</dl>
+</section>
+</div>
 </section>
 </div>
 <div id="acknowledgments">
@@ -1234,11 +1445,10 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 <a href="#name-authors-address" class="section-name selfRef">Author's Address</a>
       </h2>
 <address class="vcard">
-        <div dir="auto" class="left"><span class="fn nameRole">Your Name Here</span></div>
-<div dir="auto" class="left"><span class="org">Your Organization Here</span></div>
+        <div dir="auto" class="left"><span class="fn nameRole">Charles Lever</span></div>
 <div class="email">
 <span>Email:</span>
-<a href="mailto:your.email@example.com" class="email">your.email@example.com</a>
+<a href="mailto:cel-ietf@chucklever.net" class="email">cel-ietf@chucklever.net</a>
 </div>
 </address>
 </section>
