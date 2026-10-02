@@ -716,7 +716,53 @@ RFC8881}} requires of a client that has nothing to reclaim.
 
 ## Errors {#errors}
 
-TODO Errors
+This extension defines no new error codes.  The following existing
+codes of {{RFC8881}} are returned in circumstances that this
+extension introduces.  Each is specified in the subsection that
+describes the circumstance; this list collects them.
+
+NFS4ERR_INVAL:
+: Returned by a server that does not implement this extension to
+  an EXCHANGE_ID that sets EXCHGID4_FLAG_RETAIN_STATE
+  ({{negotiate}}).
+
+NFS4ERR_SHARE_DENIED, NFS4ERR_DENIED:
+: Returned to a request from any client that conflicts with a
+  retained open or a retained byte-range lock, respectively, while
+  the retained state is enforced ({{retain}}).  These are the
+  same results the requester would see had the retaining client
+  not restarted, and they are returned in place of the yield to a
+  conflicting request that {{Section 8.4.3 of RFC8881}} otherwise
+  requires of expired state.  NFS4ERR_SHARE_DENIED is also
+  returned to a non-reclaim OPEN from the new instance itself when
+  that OPEN conflicts with retained state ({{before-complete}}).
+
+NFS4ERR_GRACE:
+: Returned to a non-reclaim LOCK from a new instance before it
+  sends RECLAIM_COMPLETE, unchanged from {{Section 18.51.3 of
+  RFC8881}}.  Not returned to a non-reclaim OPEN from a retaining
+  client in that interval ({{before-complete}}), and not returned
+  to another client whose request conflicts with retained state
+  ({{retain}}).
+
+NFS4ERR_RECLAIM_BAD:
+: Returned to a reclaim-type request from a client owner for which
+  the server holds retained state when no retained state matches
+  the request ({{reclaim}}).
+
+NFS4ERR_NO_GRACE:
+: Returned to a reclaim-type request when the server is not in its
+  grace period and holds no retained state for the client owner,
+  whether because the state was never retained, was released at a
+  limit or by administrative action, or was released by an earlier
+  RECLAIM_COMPLETE ({{reclaim}}, {{complete}}).
+
+A server does not return NFS4ERR_RECLAIM_CONFLICT on account of
+retained state.  State revoked for a conflicting request after a
+limit is no longer retained, and a reclaim for it receives
+NFS4ERR_RECLAIM_BAD or NFS4ERR_NO_GRACE as above.  To return
+NFS4ERR_RECLAIM_CONFLICT instead, the server would have to
+remember what it had revoked ({{reclaim}}).
 
 ## Interaction with the Server's Grace Period {#grace}
 
