@@ -546,7 +546,83 @@ reply tells it, and the reply to each reclaim is authoritative.
 
 ## Reclaiming Outside the Grace Period {#reclaim}
 
-TODO Reclaiming Outside the Grace Period
+A new instance of a retaining client reclaims retained state with
+the reclaim operations that {{RFC8881}} already defines: OPEN with
+a claim type of CLAIM_PREVIOUS, and LOCK with the reclaim field
+set.  This extension defines no new claim type.  A server MUST
+accept these requests from a client owner for which it holds
+retained state whether or not the server is in its grace period.
+
+A server processes a reclaim-type request in a fixed order:
+
+1. If the server is in its own grace period, the request is an
+   ordinary reclaim and the server handles it as {{Section 8.4.2
+   of RFC8881}} specifies.  The server need not consult retained
+   state, which is not required to persist across a server
+   restart.
+
+2. Otherwise, if the server holds retained state for the client
+   owner, the server matches the request against that state as
+   described below.
+
+3. Otherwise, the server returns NFS4ERR_NO_GRACE.
+
+The client sends the same request in every case and need not know
+which case applies.
+
+An OPEN reclaim matches when the server holds a retained open for
+the same open-owner string and the same file, and that retained
+open includes the share access and share deny modes the request
+asks for.  A LOCK reclaim matches when the retained byte-range
+locks of the same lock-owner string on the same file cover the
+requested range with a compatible lock type, and the open stateid
+the request is presented under was obtained by reclaiming the
+open under which the lock was originally acquired, that is, the
+retained open with the same open-owner string on the same file.
+
+When a reclaim matches, the server moves the matched state from
+the prior instance to the new client ID and returns a new stateid
+for it.  A reclaimed byte-range lock keeps its association with
+its lock-owner, its open-owner, and its file, as {{Section 9.1.1
+of RFC8881}} describes for any lock.  The new instance therefore
+reclaims an open first and then the locks under it, which is the
+order of an ordinary grace-period reclaim, and the server path is
+the same.  A client MUST NOT attempt to reclaim a retained lock
+under a non-reclaim open.  Doing so would move the lock to a lock
+stateid under a different open, with consequences for CLOSE and
+LOCKU that {{RFC8881}} does not define.
+
+When a reclaim does not match any retained state of the client
+owner, the server returns NFS4ERR_RECLAIM_BAD.  When the server no
+longer holds any retained state for the client owner, it returns
+NFS4ERR_NO_GRACE.  State that the server revoked for a
+conflicting request after a limit in {{limits}} was reached is no
+longer retained, so a reclaim for it receives one of these two
+errors.  A server does not return NFS4ERR_RECLAIM_CONFLICT for
+retained state, because to do so it would have to remember what it
+revoked.
+
+Matching on owner strings makes owner continuity a requirement.
+The new instance MUST present the same open-owner and lock-owner
+strings that the prior instance used for the state the new
+instance reclaims.
+A gateway that lost its own record of which front-side client held
+what has, in the server's retained state, a record it can rely
+on: a reclaim succeeds only for an owner that held the state, so
+the gateway derives owner strings deterministically from
+front-side identity, as {{owners}} specifies.  The derived owner
+strings include the open-owner of an open the gateway created only
+to carry an NLM client's locks.
+
+Owner matching is a record, not authentication.  The server sees
+opaque strings and cannot tell which front-side client a reclaim
+is for, so it honors a reclaim under the right owner string
+whoever presented that reclaim to the gateway.  Whether one
+front-side client can present another's owner is decided on the
+front side, by what the gateway checks before it forwards a
+reclaim.  SP4_MACH_CRED protects the gateway's identity toward
+the server and says nothing about the gateway's clients.
+{{security}} discusses this further.
 
 ## Operations Before RECLAIM_COMPLETE {#before-complete}
 
@@ -568,6 +644,10 @@ TODO Interaction with the Server's Grace Period
 # Gateway Server Behavior
 
 TODO Gateway Server Behavior
+
+## Owner Derivation {#owners}
+
+TODO Owner Derivation
 
 
 # Backend Server Behavior
