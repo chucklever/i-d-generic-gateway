@@ -1462,7 +1462,12 @@ the transport beyond those of {{RFC8881}}.
 
 # IANA Considerations {#iana}
 
-TODO IANA
+This document has no IANA actions.
+
+The two EXCHANGE_ID flag bits that {{xdr}} assigns are not
+managed by an IANA registry.  {{RFC8881}} assigns the existing
+flag bits in its XDR description, and {{RFC7862}} added one in the
+same way.  This document follows that practice.
 
 
 --- back
