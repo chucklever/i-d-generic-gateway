@@ -1302,7 +1302,142 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
       <h2 id="name-terminology">
 <a href="#section-3" class="section-number selfRef">3. </a><a href="#name-terminology" class="section-name selfRef">Terminology</a>
       </h2>
-<p id="section-3-1">TODO Terminology<a href="#section-3-1" class="pilcrow">¶</a></p>
+<p id="section-3-1">This document uses the terms defined in <span><a href="https://rfc-editor.org/rfc/rfc8881#section-1.7" class="relref">Section 1.7</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>
+for NFSv4.1 state, leases, and recovery.  The following terms are
+specific to this document.<a href="#section-3-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-3-2">
+        <dt id="section-3-2.1">Gateway server:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.2">
+          <p id="section-3-2.2.1">A host that is an NFS server to one set of clients and an NFSv4.2
+client of a backend server, for the same file system.  Shortened
+to "gateway" where no confusion can result.<a href="#section-3-2.2.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.3">Backend server:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.4">
+          <p id="section-3-2.4.1">The NFS server that the gateway mounts.  Shortened to "backend".<a href="#section-3-2.4.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.5">Front-side client:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.6">
+          <p id="section-3-2.6.1">A client of the gateway server.  This document does not use
+"gateway client", which could as easily mean the NFS client
+that runs on the gateway host.<a href="#section-3-2.6.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.7">Direct client:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.8">
+          <p id="section-3-2.8.1">A client of the backend server that does not go through the
+gateway.<a href="#section-3-2.8.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.9">Front side, back side:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.10">
+          <p id="section-3-2.10.1">The two roles of a gateway.  On the front side the gateway is a
+server to front-side clients.  On the back side the gateway is a
+client of the backend.<a href="#section-3-2.10.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.11">Front-side state:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.12">
+          <p id="section-3-2.12.1">Open, share reservation, and lock state that the gateway has
+granted to a front-side client.<a href="#section-3-2.12.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.13">Derived state:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.14">
+          <p id="section-3-2.14.1">State that the gateway holds at the backend because of
+front-side state.  Each item of derived state stands for one or
+more items of front-side state.<a href="#section-3-2.14.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.15">Client instance:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.16">
+          <p id="section-3-2.16.1">One incarnation of an NFSv4.1 client, identified by the verifier
+in its EXCHANGE_ID client owner.  A client restart begins a new
+client instance with the same client owner identifier and a new
+verifier.<a href="#section-3-2.16.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.17">Courtesy client:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.18">
+          <p id="section-3-2.18.1">A client whose lease has expired but whose state the server has
+not yet released.  Its locks are courtesy locks
+(<span><a href="https://rfc-editor.org/rfc/rfc7530#section-9.6.3.1" class="relref">Section 9.6.3.1</a> of [<a href="#RFC7530" class="cite xref">RFC7530</a>]</span>), which the server <span class="bcp14">MUST</span> release
+when a conflicting request arrives (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).<a href="#section-3-2.18.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.19">Courteous server:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.20">
+          <p id="section-3-2.20.1">A server that keeps the state of a courtesy client for some
+time after lease expiry rather than releasing it at once.<a href="#section-3-2.20.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.21">Retaining client:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.22">
+          <p id="section-3-2.22.1">A client whose client ID was established with the extension in
+this document negotiated, so that the server retains the client's
+state across a restart of the client.<a href="#section-3-2.22.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.23">Retained state:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.24">
+          <p id="section-3-2.24.1">Opens and byte-range locks that belonged to a previous instance
+of a retaining client and that the server continues to hold and
+enforce on that client's behalf.  Unlike courtesy locks, retained
+state does not yield to a conflicting request until the absence
+limit or the reclaim cap is reached.<a href="#section-3-2.24.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.25">Absence interval:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.26">
+          <p id="section-3-2.26.1">The time from expiry of a retaining client's lease until a new
+instance of that client is confirmed.<a href="#section-3-2.26.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.27">Absence limit:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.28">
+          <p id="section-3-2.28.1">The longest absence interval during which a server continues to
+enforce retained state against conflicting requests from other
+clients.  A local policy value of the server.<a href="#section-3-2.28.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.29">Reclaim interval:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.30">
+          <p id="section-3-2.30.1">The time from confirmation of a new instance of a retaining
+client until that instance sends RECLAIM_COMPLETE.<a href="#section-3-2.30.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.31">Reclaim cap:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.32">
+          <p id="section-3-2.32.1">The longest reclaim interval during which a server continues to
+enforce retained state that the new instance has not yet
+reclaimed.  A local policy value of the server.<a href="#section-3-2.32.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.33">Synthetic open-owner:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.34">
+          <p id="section-3-2.34.1">An open-owner that a gateway constructs for an NLM client, which
+has no concept of an open, so that the gateway can hold a
+back-side open under which to take that client's byte-range
+locks.<a href="#section-3-2.34.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.35">Pass-through deny mode:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.36">
+          <p id="section-3-2.36.1">A gateway mode in which a derived open carries at least the share
+deny bits of the front-side open or NLM_SHARE that it stands for,
+so that the backend enforces them against direct clients.<a href="#section-3-2.36.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-3-2.37">Local-only deny mode:</dt>
+        <dd style="margin-left: 1.5em" id="section-3-2.38">
+          <p id="section-3-2.38.1">A gateway mode in which a derived open carries no share deny
+bits.  The gateway enforces the front-side deny mode itself, and
+the deny mode binds front-side clients only.<a href="#section-3-2.38.1" class="pilcrow">¶</a></p>
+</dd>
+      <dd class="break"></dd>
+</dl>
 </section>
 </div>
 <div id="problem">
@@ -1321,7 +1456,7 @@ the parties that hold state there.<a href="#section-4-1" class="pilcrow">¶</a><
 <figure id="figure-1">
         <div class="alignLeft art-text artwork" id="section-4-2.1">
 <pre>
-  gateway clients          gateway            backend
+  front-side clients       gateway            backend
   +-----------+        +-------------+     +-----------+
   | NFSv3/NLM |-------&gt;| NFS server  |     |           |
   | NFSv4.x   |        |     |       |     |    NFS    |
