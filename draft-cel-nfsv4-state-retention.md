@@ -143,7 +143,102 @@ not address.
 
 # Terminology
 
-TODO Terminology
+This document uses the terms defined in {{Section 1.7 of RFC8881}}
+for NFSv4.1 state, leases, and recovery.  The following terms are
+specific to this document.
+
+Gateway server:
+: A host that is an NFS server to one set of clients and an NFSv4.2
+  client of a backend server, for the same file system.  Shortened
+  to "gateway" where no confusion can result.
+
+Backend server:
+: The NFS server that the gateway mounts.  Shortened to "backend".
+
+Front-side client:
+: A client of the gateway server.  This document does not use
+  "gateway client", which could as easily mean the NFS client
+  that runs on the gateway host.
+
+Direct client:
+: A client of the backend server that does not go through the
+  gateway.
+
+Front side, back side:
+: The two roles of a gateway.  On the front side the gateway is a
+  server to front-side clients.  On the back side the gateway is a
+  client of the backend.
+
+Front-side state:
+: Open, share reservation, and lock state that the gateway has
+  granted to a front-side client.
+
+Derived state:
+: State that the gateway holds at the backend because of
+  front-side state.  Each item of derived state stands for one or
+  more items of front-side state.
+
+Client instance:
+: One incarnation of an NFSv4.1 client, identified by the verifier
+  in its EXCHANGE_ID client owner.  A client restart begins a new
+  client instance with the same client owner identifier and a new
+  verifier.
+
+Courtesy client:
+: A client whose lease has expired but whose state the server has
+  not yet released.  Its locks are courtesy locks
+  ({{Section 9.6.3.1 of RFC7530}}), which the server MUST release
+  when a conflicting request arrives ({{Section 8.4.3 of RFC8881}}).
+
+Courteous server:
+: A server that keeps the state of a courtesy client for some
+  time after lease expiry rather than releasing it at once.
+
+Retaining client:
+: A client whose client ID was established with the extension in
+  this document negotiated, so that the server retains the client's
+  state across a restart of the client.
+
+Retained state:
+: Opens and byte-range locks that belonged to a previous instance
+  of a retaining client and that the server continues to hold and
+  enforce on that client's behalf.  Unlike courtesy locks, retained
+  state does not yield to a conflicting request until the absence
+  limit or the reclaim cap is reached.
+
+Absence interval:
+: The time from expiry of a retaining client's lease until a new
+  instance of that client is confirmed.
+
+Absence limit:
+: The longest absence interval during which a server continues to
+  enforce retained state against conflicting requests from other
+  clients.  A local policy value of the server.
+
+Reclaim interval:
+: The time from confirmation of a new instance of a retaining
+  client until that instance sends RECLAIM_COMPLETE.
+
+Reclaim cap:
+: The longest reclaim interval during which a server continues to
+  enforce retained state that the new instance has not yet
+  reclaimed.  A local policy value of the server.
+
+Synthetic open-owner:
+: An open-owner that a gateway constructs for an NLM client, which
+  has no concept of an open, so that the gateway can hold a
+  back-side open under which to take that client's byte-range
+  locks.
+
+Pass-through deny mode:
+: A gateway mode in which a derived open carries at least the share
+  deny bits of the front-side open or NLM_SHARE that it stands for,
+  so that the backend enforces them against direct clients.
+
+Local-only deny mode:
+: A gateway mode in which a derived open carries no share deny
+  bits.  The gateway enforces the front-side deny mode itself, and
+  the deny mode binds front-side clients only.
 
 
 # Problem Summary {#problem}
@@ -158,7 +253,7 @@ and the backend is the only party that can arbitrate among all of
 the parties that hold state there.
 
 ~~~
-  gateway clients          gateway            backend
+  front-side clients       gateway            backend
   +-----------+        +-------------+     +-----------+
   | NFSv3/NLM |------->| NFS server  |     |           |
   | NFSv4.x   |        |     |       |     |    NFS    |
