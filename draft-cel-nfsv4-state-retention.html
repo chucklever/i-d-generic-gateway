@@ -1177,7 +1177,25 @@ permit the new instance of that client to reclaim that state.<a href="#section-a
                 <p id="section-toc.1-1.5.2.1.1"><a href="#section-5.1" class="auto internal xref">5.1</a>.  <a href="#name-capability-negotiation" class="internal xref">Capability Negotiation</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.2">
-                <p id="section-toc.1-1.5.2.2.1"><a href="#section-5.2" class="auto internal xref">5.2</a>.  <a href="#name-intervals-and-limits" class="internal xref">Intervals and Limits</a></p>
+                <p id="section-toc.1-1.5.2.2.1"><a href="#section-5.2" class="auto internal xref">5.2</a>.  <a href="#name-retaining-state" class="internal xref">Retaining State</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.3">
+                <p id="section-toc.1-1.5.2.3.1"><a href="#section-5.3" class="auto internal xref">5.3</a>.  <a href="#name-intervals-and-limits" class="internal xref">Intervals and Limits</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.4">
+                <p id="section-toc.1-1.5.2.4.1"><a href="#section-5.4" class="auto internal xref">5.4</a>.  <a href="#name-reclaiming-outside-the-grac" class="internal xref">Reclaiming Outside the Grace Period</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.5">
+                <p id="section-toc.1-1.5.2.5.1"><a href="#section-5.5" class="auto internal xref">5.5</a>.  <a href="#name-operations-before-reclaim_c" class="internal xref">Operations Before RECLAIM_COMPLETE</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.6">
+                <p id="section-toc.1-1.5.2.6.1"><a href="#section-5.6" class="auto internal xref">5.6</a>.  <a href="#name-completing-reclaim" class="internal xref">Completing Reclaim</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.7">
+                <p id="section-toc.1-1.5.2.7.1"><a href="#section-5.7" class="auto internal xref">5.7</a>.  <a href="#name-errors" class="internal xref">Errors</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.8">
+                <p id="section-toc.1-1.5.2.8.1"><a href="#section-5.8" class="auto internal xref">5.8</a>.  <a href="#name-interaction-with-the-server" class="internal xref">Interaction with the Server's Grace Period</a></p>
 </li>
             </ul>
 </li>
@@ -1671,21 +1689,98 @@ whether it is available at EXCHANGE_ID, before it has a session
 with which to read an attribute.<a href="#section-5.1-10" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="limits">
+<div id="retain">
 <section id="section-5.2">
-        <h3 id="name-intervals-and-limits">
-<a href="#section-5.2" class="section-number selfRef">5.2. </a><a href="#name-intervals-and-limits" class="section-name selfRef">Intervals and Limits</a>
+        <h3 id="name-retaining-state">
+<a href="#section-5.2" class="section-number selfRef">5.2. </a><a href="#name-retaining-state" class="section-name selfRef">Retaining State</a>
         </h3>
-<p id="section-5.2-1">Retained state blocks other clients, so a server bounds how long
-it enforces that state.  Two intervals are bounded separately.<a href="#section-5.2-1" class="pilcrow">¶</a></p>
-<p id="section-5.2-2">The absence interval runs from expiry of the old instance's lease
+<p id="section-5.2-1"><span>[<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> has a server release a client's state in two
+situations: when a new instance of the client is confirmed
+(<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.1" class="relref">Section 8.4.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>), and when the client's lease
+expires and the server chooses not to keep the state as courtesy
+locks (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  For a retaining client,
+a server <span class="bcp14">MUST NOT</span> release the opens and byte-range locks of the
+client in either situation.  Instead, the server retains them.
+Retention at the confirmation of a new instance happens when
+CREATE_SESSION confirms the new client ID, which is the point at
+which <span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.35.4" class="relref">Section 18.35.4</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> has the server replace the
+prior instance's record.  Nothing changes at EXCHANGE_ID.<a href="#section-5.2-1" class="pilcrow">¶</a></p>
+<p id="section-5.2-2">The state that a server retains consists of:<a href="#section-5.2-2" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-5.2-3.1">
+            <p id="section-5.2-3.1.1">the client's opens, with the share access and share deny modes
+the server holds for each of them; and<a href="#section-5.2-3.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-5.2-3.2">
+            <p id="section-5.2-3.2.1">the client's byte-range locks.<a href="#section-5.2-3.2.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-5.2-4">The server does not retain the prior instance's sessions, its
+client ID, or its stateids.  A new instance obtains new stateids
+for the state it reclaims.  The server does not retain layouts.
+Delegations are handled as <span>[<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> specifies, and in
+particular a server that supports CLAIM_DELEGATE_PREV handles them
+as <span><a href="https://rfc-editor.org/rfc/rfc8881#section-10.2.1" class="relref">Section 10.2.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> describes.  This extension does
+not change delegation handling.<a href="#section-5.2-4" class="pilcrow">¶</a></p>
+<p id="section-5.2-5">Retained state behaves as though the prior instance still held
+it.  A request from another client that conflicts with a retained
+open fails with NFS4ERR_SHARE_DENIED, and one that conflicts with
+a retained byte-range lock fails with NFS4ERR_DENIED.  These are
+the results the other client would have seen had the retaining
+client not restarted.  The server <span class="bcp14">MUST NOT</span> return a grace-period
+error for such a conflict.  This is a departure from
+<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>, which requires that the state of a
+client whose lease has expired yield to a conflicting request.
+For a retaining client, that requirement is suspended until one
+of the limits in <a href="#limits" class="auto internal xref">Section 5.3</a> is reached, after which it applies
+again.<a href="#section-5.2-5" class="pilcrow">¶</a></p>
+<p id="section-5.2-6"><span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> also has a server record in stable
+storage that a client's lease expired, so that the server can
+reject the client's reclaims after a server restart with
+NFS4ERR_NO_GRACE.  The reason for that record is that another
+client could have acquired a conflicting lock in the interim.  For
+a retaining client the reason does not hold while the state is
+retained, because no conflicting lock is granted.  A server <span class="bcp14">MUST NOT</span> make that record at lease expiry for a retaining client.  The
+server makes the record when it releases or revokes retained
+state, whether at a limit, at the first conflicting request after
+a limit, or by administrative action.  <a href="#grace" class="auto internal xref">Section 5.8</a> describes the
+consequences for a server restart.<a href="#section-5.2-6" class="pilcrow">¶</a></p>
+<p id="section-5.2-7">Retained state accumulates across repeated restarts of the same
+client owner.  If a new instance is confirmed, reclaims some of the
+retained state, and then itself restarts before sending
+RECLAIM_COMPLETE, the server retains both the state that instance
+held and the remainder it never reclaimed.  A RECLAIM_COMPLETE
+from any later instance releases everything not yet reclaimed, as
+<a href="#complete" class="auto internal xref">Section 5.6</a> specifies.  Each item of retained state keeps the
+reclaim-cap clock started by the first confirmation after it was
+retained.  A later confirmation <span class="bcp14">MUST NOT</span> restart that clock.
+Without that rule, a client that restarts in a loop could block
+other clients without bound with state it never reclaims, since
+every confirmation would start the cap over.  State the client
+does reclaim after each restart is held legitimately each time,
+so a fresh clock for it, started when the next instance is
+confirmed, costs other clients nothing they were owed.<a href="#section-5.2-7" class="pilcrow">¶</a></p>
+<p id="section-5.2-8">A server is not required to preserve retained state across a
+restart of the server itself.  <a href="#grace" class="auto internal xref">Section 5.8</a> describes what happens
+when a server restarts during an absence interval or a reclaim
+interval.<a href="#section-5.2-8" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="limits">
+<section id="section-5.3">
+        <h3 id="name-intervals-and-limits">
+<a href="#section-5.3" class="section-number selfRef">5.3. </a><a href="#name-intervals-and-limits" class="section-name selfRef">Intervals and Limits</a>
+        </h3>
+<p id="section-5.3-1">Retained state blocks other clients, so a server bounds how long
+it enforces that state.  Two intervals are bounded separately.<a href="#section-5.3-1" class="pilcrow">¶</a></p>
+<p id="section-5.3-2">The absence interval runs from expiry of the old instance's lease
 until a new instance is confirmed.  A server <span class="bcp14">MUST</span> bound the
 absence interval with an absence limit, a local policy value.
 Within the absence limit, a retaining client that is partitioned
 rather than restarted, and that returns with the same verifier,
 resumes with its state intact.  For such a client the absence
-limit acts as a longer lease.<a href="#section-5.2-2" class="pilcrow">¶</a></p>
-<p id="section-5.2-3">The reclaim interval runs from confirmation of the new instance
+limit acts as a longer lease.<a href="#section-5.3-2" class="pilcrow">¶</a></p>
+<p id="section-5.3-3">The reclaim interval runs from confirmation of the new instance
 until that instance sends RECLAIM_COMPLETE.  A server <span class="bcp14">MUST</span> bound
 the reclaim interval with a reclaim cap, a local policy value.
 Within the reclaim cap, the new instance's lease renewals keep the
@@ -1694,17 +1789,57 @@ already reclaimed is ordinary state of a live client, and the
 reclaim cap does not apply to it.  Without a cap, a faulty client
 that returns, renews its lease, and never sends RECLAIM_COMPLETE
 would block other clients indefinitely with state nobody is going
-to reclaim.<a href="#section-5.2-3" class="pilcrow">¶</a></p>
-<p id="section-5.2-4">When either limit is reached, the retained state it governs <span class="bcp14">MUST</span>
+to reclaim.<a href="#section-5.3-3" class="pilcrow">¶</a></p>
+<p id="section-5.3-4">When either limit is reached, the retained state it governs <span class="bcp14">MUST</span>
 stop blocking conflicting requests.  The server need not destroy
 the state at that moment.  The server <span class="bcp14">MAY</span> keep the state as
 <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> allows for expired state and revoke
 it when the first conflicting request arrives.  A reclaim that
 finds the state still in place succeeds, and does so safely,
-because nothing that conflicts was granted in the meantime.<a href="#section-5.2-4" class="pilcrow">¶</a></p>
-<p id="section-5.2-5">Neither limit is advertised to the client.  A client needs to
+because nothing that conflicts was granted in the meantime.<a href="#section-5.3-4" class="pilcrow">¶</a></p>
+<p id="section-5.3-5">Neither limit is advertised to the client.  A client needs to
 know only whether reclaims can succeed, which the EXCHANGE_ID
-reply tells it, and the reply to each reclaim is authoritative.<a href="#section-5.2-5" class="pilcrow">¶</a></p>
+reply tells it, and the reply to each reclaim is authoritative.<a href="#section-5.3-5" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="reclaim">
+<section id="section-5.4">
+        <h3 id="name-reclaiming-outside-the-grac">
+<a href="#section-5.4" class="section-number selfRef">5.4. </a><a href="#name-reclaiming-outside-the-grac" class="section-name selfRef">Reclaiming Outside the Grace Period</a>
+        </h3>
+<p id="section-5.4-1">TODO Reclaiming Outside the Grace Period<a href="#section-5.4-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="before-complete">
+<section id="section-5.5">
+        <h3 id="name-operations-before-reclaim_c">
+<a href="#section-5.5" class="section-number selfRef">5.5. </a><a href="#name-operations-before-reclaim_c" class="section-name selfRef">Operations Before RECLAIM_COMPLETE</a>
+        </h3>
+<p id="section-5.5-1">TODO Operations Before RECLAIM_COMPLETE<a href="#section-5.5-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="complete">
+<section id="section-5.6">
+        <h3 id="name-completing-reclaim">
+<a href="#section-5.6" class="section-number selfRef">5.6. </a><a href="#name-completing-reclaim" class="section-name selfRef">Completing Reclaim</a>
+        </h3>
+<p id="section-5.6-1">TODO Completing Reclaim<a href="#section-5.6-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="errors">
+<section id="section-5.7">
+        <h3 id="name-errors">
+<a href="#section-5.7" class="section-number selfRef">5.7. </a><a href="#name-errors" class="section-name selfRef">Errors</a>
+        </h3>
+<p id="section-5.7-1">TODO Errors<a href="#section-5.7-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="grace">
+<section id="section-5.8">
+        <h3 id="name-interaction-with-the-server">
+<a href="#section-5.8" class="section-number selfRef">5.8. </a><a href="#name-interaction-with-the-server" class="section-name selfRef">Interaction with the Server's Grace Period</a>
+        </h3>
+<p id="section-5.8-1">TODO Interaction with the Server's Grace Period<a href="#section-5.8-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
