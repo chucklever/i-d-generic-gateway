@@ -1203,10 +1203,28 @@ permit the new instance of that client to reclaim that state.<a href="#section-a
             <p id="section-toc.1-1.6.1"><a href="#section-6" class="auto internal xref">6</a>.  <a href="#name-gateway-server-behavior" class="internal xref">Gateway Server Behavior</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.1">
-                <p id="section-toc.1-1.6.2.1.1"><a href="#section-6.1" class="auto internal xref">6.1</a>.  <a href="#name-owner-derivation" class="internal xref">Owner Derivation</a></p>
+                <p id="section-toc.1-1.6.2.1.1"><a href="#section-6.1" class="auto internal xref">6.1</a>.  <a href="#name-what-is-recoverable" class="internal xref">What Is Recoverable</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.2">
-                <p id="section-toc.1-1.6.2.2.1"><a href="#section-6.2" class="auto internal xref">6.2</a>.  <a href="#name-restart-sequence" class="internal xref">Restart Sequence</a></p>
+                <p id="section-toc.1-1.6.2.2.1"><a href="#section-6.2" class="auto internal xref">6.2</a>.  <a href="#name-owner-derivation" class="internal xref">Owner Derivation</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.3">
+                <p id="section-toc.1-1.6.2.3.1"><a href="#section-6.3" class="auto internal xref">6.3</a>.  <a href="#name-stable-storage" class="internal xref">Stable Storage</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.4">
+                <p id="section-toc.1-1.6.2.4.1"><a href="#section-6.4" class="auto internal xref">6.4</a>.  <a href="#name-restart-sequence" class="internal xref">Restart Sequence</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.5">
+                <p id="section-toc.1-1.6.2.5.1"><a href="#section-6.5" class="auto internal xref">6.5</a>.  <a href="#name-nfsv3-front-side-clients" class="internal xref">NFSv3 Front-Side Clients</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.6">
+                <p id="section-toc.1-1.6.2.6.1"><a href="#section-6.6" class="auto internal xref">6.6</a>.  <a href="#name-nfsv4-front-side-clients" class="internal xref">NFSv4 Front-Side Clients</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.7">
+                <p id="section-toc.1-1.6.2.7.1"><a href="#section-6.7" class="auto internal xref">6.7</a>.  <a href="#name-backend-restart" class="internal xref">Backend Restart</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6.2.8">
+                <p id="section-toc.1-1.6.2.8.1"><a href="#section-6.8" class="auto internal xref">6.8</a>.  <a href="#name-reporting-lost-state" class="internal xref">Reporting Lost State</a></p>
 </li>
             </ul>
 </li>
@@ -1875,7 +1893,7 @@ A gateway that lost its own record of which front-side client held
 what has, in the server's retained state, a record it can rely
 on: a reclaim succeeds only for an owner that held the state, so
 the gateway derives owner strings deterministically from
-front-side identity, as <a href="#owners" class="auto internal xref">Section 6.1</a> specifies.  That includes the
+front-side identity, as <a href="#owners" class="auto internal xref">Section 6.2</a> specifies.  That includes the
 open-owner of an open the gateway created only to carry an NLM
 client's locks.<a href="#section-5.4-8" class="pilcrow">¶</a></p>
 <p id="section-5.4-9">Owner matching is a record, not authentication.  The server sees
@@ -1964,7 +1982,7 @@ state for the client owner and receives NFS4ERR_NO_GRACE, as
 <a href="#reclaim" class="auto internal xref">Section 5.4</a> specifies.  A gateway whose front-side grace period
 has ended has nothing further to forward, so this case arises only
 from a reclaim that a front-side client sends late, and the
-gateway refuses it as <a href="#gateway-reclaim" class="auto internal xref">Section 6.2</a> describes.<a href="#section-5.6-4" class="pilcrow">¶</a></p>
+gateway refuses it as <a href="#gateway-reclaim" class="auto internal xref">Section 6.4</a> describes.<a href="#section-5.6-4" class="pilcrow">¶</a></p>
 <p id="section-5.6-5">RECLAIM_COMPLETE from any instance of the client owner releases
 everything retained and not yet reclaimed, including the remainder
 from an earlier instance that restarted before sending its own
@@ -2103,7 +2121,7 @@ the absence limit when the retaining client never returns.  A
 server operator has to be able to decline that cost.  What the
 protocol cannot leave to policy is safety: a gateway grants a
 front-side reclaim only when the corresponding back-side reclaim
-succeeded, as <a href="#gateway-reclaim" class="auto internal xref">Section 6.2</a> specifies, so a server that
+succeeded, as <a href="#gateway-reclaim" class="auto internal xref">Section 6.4</a> specifies, so a server that
 ends its grace period early causes a front-side client to be told
 that its state is lost, and never causes state to be re-granted
 without protection.  Continuity across a restart of both the
@@ -2113,26 +2131,371 @@ not.<a href="#section-5.8-7" class="pilcrow">¶</a></p>
 </div>
 </section>
 </div>
-<div id="gateway-server-behavior">
+<div id="gateway">
 <section id="section-6">
       <h2 id="name-gateway-server-behavior">
 <a href="#section-6" class="section-number selfRef">6. </a><a href="#name-gateway-server-behavior" class="section-name selfRef">Gateway Server Behavior</a>
       </h2>
-<p id="section-6-1">TODO Gateway Server Behavior<a href="#section-6-1" class="pilcrow">¶</a></p>
-<div id="owners">
+<p id="section-6-1">This section specifies how a gateway uses the extension.  The
+requirements here are on the gateway, in both of its roles.
+<a href="#extension" class="auto internal xref">Section 5</a> places no requirement on a gateway beyond those of
+any retaining client.<a href="#section-6-1" class="pilcrow">¶</a></p>
+<div id="recoverable">
 <section id="section-6.1">
-        <h3 id="name-owner-derivation">
-<a href="#section-6.1" class="section-number selfRef">6.1. </a><a href="#name-owner-derivation" class="section-name selfRef">Owner Derivation</a>
+        <h3 id="name-what-is-recoverable">
+<a href="#section-6.1" class="section-number selfRef">6.1. </a><a href="#name-what-is-recoverable" class="section-name selfRef">What Is Recoverable</a>
         </h3>
-<p id="section-6.1-1">TODO Owner Derivation<a href="#section-6.1-1" class="pilcrow">¶</a></p>
+<p id="section-6.1-1">Retention preserves what the backend holds and nothing else.  A
+front-side reclaim can succeed with its protection intact only if
+the backend's conflict protection for the corresponding derived
+state remained in force from the original grant until the new
+instance of the gateway recovered it.  Front-side state that has
+no derived counterpart cannot meet that condition.  A gateway is
+free today to enforce some front-side state in its own tables
+without creating derived state for it, and for such state a
+gateway restart leaves the guarantee exactly as weak as it was
+before: the gateway re-grants the state during its own grace
+period, and the backend is not involved.<a href="#section-6.1-1" class="pilcrow">¶</a></p>
+<p id="section-6.1-2">Share deny modes are the known case.  A gateway handles them in
+one of two modes, and the choice belongs to the implementer.<a href="#section-6.1-2" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-6.1-3">
+          <dt id="section-6.1-3.1">Pass-through:</dt>
+          <dd style="margin-left: 1.5em" id="section-6.1-3.2">
+            <p id="section-6.1-3.2.1">The derived open carries at least the share deny bits of the
+front-side open or NLM_SHARE it stands for.  The backend
+enforces those bits against direct clients, retains them with
+the open, and matches them on reclaim.  A front-side deny mode
+recovered in this mode has been protected throughout.<a href="#section-6.1-3.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-6.1-3.3">Local-only:</dt>
+          <dd style="margin-left: 1.5em" id="section-6.1-3.4">
+            <p id="section-6.1-3.4.1">The derived open carries no share deny bits.  The gateway
+enforces the front-side deny mode in its own tables.  The deny
+mode binds front-side clients only, before and after a restart,
+and a front-side reclaim is re-granted from the gateway's own
+grace-period arbitration.  This document does not count that as
+recovered share exclusion.<a href="#section-6.1-3.4.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-6.1-4">A gateway that implements neither mode <span class="bcp14">MAY</span> refuse a front-side
+request that carries a deny mode.<a href="#section-6.1-4" class="pilcrow">¶</a></p>
+<p id="section-6.1-5">Only pass-through protects a front-side client against direct
+clients.  A front-side client has no way to learn which mode it
+was given, because neither NFSv4 nor NLM_SHARE can signal it, so
+an operator who needs share exclusion against direct clients has
+to know which mode the gateway runs.<a href="#section-6.1-5" class="pilcrow">¶</a></p>
+<p id="section-6.1-6">A gateway's deny mode <span class="bcp14">MUST NOT</span> change across a restart of the
+gateway.  A gateway that was local-only before a restart and
+pass-through after it would send a reclaim OPEN with deny bits
+that the retained open lacks, and the backend would answer
+NFS4ERR_RECLAIM_BAD (<a href="#reclaim" class="auto internal xref">Section 5.4</a>).  The mode is therefore
+persistent configuration (<a href="#stable" class="auto internal xref">Section 6.3</a>).  A gateway whose mode has
+nonetheless changed retries the reclaim without deny bits and
+treats the result as local-only.<a href="#section-6.1-6" class="pilcrow">¶</a></p>
+<p id="section-6.1-7">Pass-through requires one back-side open-owner per front-side
+owner (<a href="#owners" class="auto internal xref">Section 6.2</a>).  A deny mode conflicts with opens by other
+open-owners, including other owners of the same client, so with
+that mapping the backend arbitrates deny modes among front-side
+clients as well as against direct clients.  A gateway that
+aggregates many front-side owners under one back-side open-owner
+is local-only for conflicts among its own clients, whatever bits
+it sends, and after a restart it cannot rely on owner matching to
+tell their opens apart.<a href="#section-6.1-7" class="pilcrow">¶</a></p>
+<p id="section-6.1-8">Opens and locks that a gateway services locally under a back-side
+delegation are a second case of state with no derived counterpart.
+<a href="#gateway-nfsv4" class="auto internal xref">Section 6.6</a> specifies how a gateway avoids it.<a href="#section-6.1-8" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="owners">
+<section id="section-6.2">
+        <h3 id="name-owner-derivation">
+<a href="#section-6.2" class="section-number selfRef">6.2. </a><a href="#name-owner-derivation" class="section-name selfRef">Owner Derivation</a>
+        </h3>
+<p id="section-6.2-1">The matching rule in <a href="#reclaim" class="auto internal xref">Section 5.4</a> requires the new instance of a
+gateway to present the same open-owner and lock-owner strings that
+the prior instance used.  The gateway has no record of those
+strings after a restart other than what it can reconstruct from
+the reclaim request itself, so a gateway <span class="bcp14">MUST</span> derive each
+back-side owner string deterministically from values that a
+front-side reclaim request supplies.  The backend treats owner
+strings as opaque, so this document requires determinism and
+recommends a construction without mandating one.<a href="#section-6.2-1" class="pilcrow">¶</a></p>
+<p id="section-6.2-2">For an NLM front-side client, the gateway derives the back-side
+lock-owner from the NLM caller name and the NLM owner handle.
+NLM has no opens, so the gateway also derives a synthetic
+open-owner from the same two values and holds one back-side open
+per synthetic open-owner and file.  All of that NLM owner's locks
+on the file are taken under that open, and the gateway closes the
+open when the last of them is released.  The synthetic open has
+to be reclaimable from an NLM reclaim request alone, which
+supplies the file handle, the caller name, and the owner handle.
+The gateway therefore chooses the open's share access by a rule
+that needs nothing else.<a href="#section-6.2-2" class="pilcrow">¶</a></p>
+<p id="section-6.2-3">For an NFSv4 front-side client, the gateway derives the back-side
+owner from the front-side client owner string and the front-side
+open-owner or lock-owner.<a href="#section-6.2-3" class="pilcrow">¶</a></p>
+<p id="section-6.2-4">Before it forwards a reclaim, a gateway <span class="bcp14">MUST</span> check the reclaiming
+front-side client against whatever identity the front-side
+protocol authenticates, and the derived owner <span class="bcp14">MUST</span> be built from
+values tied to that identity.  For NFSv4, a reclaim arrives under
+a front-side client ID.  The gateway accepts it only from a client
+owner in its record of clients permitted to reclaim (<a href="#stable" class="auto internal xref">Section 6.3</a>),
+and only under the principal that <span>[<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> requires for that
+client owner.  The derived owner includes the front-side client
+owner string, so it is bound to that check without carrying the
+principal itself.  For NLM, the caller name and owner handle are
+supplied in the request and nothing in NLM authenticates them.
+The gateway accepts a reclaim only for a caller in its NSM monitor
+list.  It <span class="bcp14">MAY</span> also record the RPC credential or the source address
+with that entry and require a match.  With RPCSEC_GSS that is a
+binding to an authenticated identity.  With AUTH_SYS it is not.<a href="#section-6.2-4" class="pilcrow">¶</a></p>
+<p id="section-6.2-5">On a front side that NLM does not authenticate, a host that can
+reach the gateway and present another client's caller name and
+owner handle during the gateway's grace period can reclaim that
+client's lock.  The same is true of any NLM server, so the gateway
+adds no exposure that NLM did not already have, but owner matching
+on the backend does not remove it either.  <a href="#security" class="auto internal xref">Section 9</a> discusses
+this further.<a href="#section-6.2-5" class="pilcrow">¶</a></p>
+<p id="section-6.2-6">Each front-side component of an owner can be up to 1024 bytes
+long, and so can the back-side owner string, so the construction
+needs a hash.  A collision between two front-side owners makes
+them share back-side state: the backend treats their opens and
+locks as belonging to one owner, so a conflict between them is
+not detected and a reclaim by one can recover state of the other.
+A gateway <span class="bcp14">SHOULD</span> use a hash whose output length makes an
+accidental collision negligible.<a href="#section-6.2-6" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="stable">
+<section id="section-6.3">
+        <h3 id="name-stable-storage">
+<a href="#section-6.3" class="section-number selfRef">6.3. </a><a href="#name-stable-storage" class="section-name selfRef">Stable Storage</a>
+        </h3>
+<p id="section-6.3-1">A gateway keeps the following in stable storage, in addition to
+whatever its front-side and back-side implementations already
+require:<a href="#section-6.3-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-6.3-2.1">
+            <p id="section-6.3-2.1.1">the back-side client owner string, so that each instance of the
+gateway presents the same client owner to the backend;<a href="#section-6.3-2.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-6.3-2.2">
+            <p id="section-6.3-2.2.1">the record of front-side clients permitted to reclaim, which is
+the NFSv4 client list that <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>
+requires of any NFSv4 server, and the NSM monitor list that NLM
+requires of any NLM server, optionally with the RPC credential
+or source address of each NLM caller (<a href="#owners" class="auto internal xref">Section 6.2</a>); and<a href="#section-6.3-2.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-6.3-2.3">
+            <p id="section-6.3-2.3.1">the deny mode in use, pass-through or local-only
+(<a href="#recoverable" class="auto internal xref">Section 6.1</a>).<a href="#section-6.3-2.3.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
 </section>
 </div>
 <div id="gateway-reclaim">
-<section id="section-6.2">
+<section id="section-6.4">
         <h3 id="name-restart-sequence">
-<a href="#section-6.2" class="section-number selfRef">6.2. </a><a href="#name-restart-sequence" class="section-name selfRef">Restart Sequence</a>
+<a href="#section-6.4" class="section-number selfRef">6.4. </a><a href="#name-restart-sequence" class="section-name selfRef">Restart Sequence</a>
         </h3>
-<p id="section-6.2-1">TODO Restart Sequence<a href="#section-6.2-1" class="pilcrow">¶</a></p>
+<p id="section-6.4-1">When a gateway starts after a restart, it proceeds in this order:<a href="#section-6.4-1" class="pilcrow">¶</a></p>
+<ol start="1" type="1" class="normal type-1" id="section-6.4-2">
+<li id="section-6.4-2.1">
+            <p id="section-6.4-2.1.1">The gateway sends EXCHANGE_ID with EXCHGID4_FLAG_RETAIN_STATE
+to the backend, then CREATE_SESSION.<a href="#section-6.4-2.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li id="section-6.4-2.2">
+            <p id="section-6.4-2.2.1">The gateway begins its front-side grace period and notifies
+its front-side clients: SM_NOTIFY to the callers in its NSM
+monitor list, and the ordinary NFSv4 restart indications to its
+NFSv4 clients.<a href="#section-6.4-2.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li id="section-6.4-2.3">
+            <p id="section-6.4-2.3.1">The gateway forwards each front-side reclaim to the backend as
+a back-side reclaim and answers the front-side client from the
+backend's reply.<a href="#section-6.4-2.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li id="section-6.4-2.4">
+            <p id="section-6.4-2.4.1">When the front-side grace period ends, the gateway sends
+RECLAIM_COMPLETE to the backend.<a href="#section-6.4-2.4.1" class="pilcrow">¶</a></p>
+</li>
+        </ol>
+<p id="section-6.4-3">The gateway decides once, from the EXCHANGE_ID reply, whether
+reclaims can succeed, and then the backend decides each reclaim.<a href="#section-6.4-3" class="pilcrow">¶</a></p>
+<p id="section-6.4-4">If the reply carries EXCHGID4_FLAG_RECLAIMABLE_R, the gateway runs
+the sequence above in full.  The gateway <span class="bcp14">MUST</span> grant a front-side
+reclaim only if the corresponding back-side reclaim succeeded, and
+<span class="bcp14">MUST</span> refuse a front-side reclaim whose back-side reclaim failed.
+The gateway does not need to know whether the backend answered
+from retained state or from its own grace period, because the
+requests are the same in both cases (<a href="#reclaim" class="auto internal xref">Section 5.4</a>).  The gateway
+withholds RECLAIM_COMPLETE until its front-side grace period ends.<a href="#section-6.4-4" class="pilcrow">¶</a></p>
+<p id="section-6.4-5">If the reply does not carry EXCHGID4_FLAG_RECLAIMABLE_R, the
+gateway still notifies its front-side clients, sends
+RECLAIM_COMPLETE at once, and refuses every front-side reclaim.
+This covers a return after the retained state was released, and a
+backend that restarted and has either left its grace period or
+has no record of this client owner.  A gateway treats a backend
+that does not implement the extension, detected by NFS4ERR_INVAL
+and the retry without the flag, or that declines retention, in the
+same way.  The gateway notifies in every case because a refused
+reclaim is the only way an NLM client learns that a lock is gone.<a href="#section-6.4-5" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="gateway-nfsv3">
+<section id="section-6.5">
+        <h3 id="name-nfsv3-front-side-clients">
+<a href="#section-6.5" class="section-number selfRef">6.5. </a><a href="#name-nfsv3-front-side-clients" class="section-name selfRef">NFSv3 Front-Side Clients</a>
+        </h3>
+<p id="section-6.5-1">An NFSv3 client learns of the gateway's restart from SM_NOTIFY and
+reclaims each lock with an NLM_LOCK request that has the reclaim
+field set.  The gateway maps that request to a back-side OPEN with
+CLAIM_PREVIOUS for the synthetic open-owner derived from the
+request, followed by a LOCK with the reclaim field set under the
+reclaimed open (<a href="#owners" class="auto internal xref">Section 6.2</a>).  If both succeed, the gateway grants
+the NLM reclaim.  If either fails, the gateway denies it.<a href="#section-6.5-1" class="pilcrow">¶</a></p>
+<p id="section-6.5-2">An NLM_SHARE request carries a deny mode.  The gateway handles it
+in the deny mode it runs (<a href="#recoverable" class="auto internal xref">Section 6.1</a>).  In pass-through mode,
+the derived open carries the deny bits and is reclaimed with them.
+In local-only mode, the gateway re-grants the share from its own
+tables during its grace period.<a href="#section-6.5-2" class="pilcrow">¶</a></p>
+<p id="section-6.5-3">NLM does not gate READ and WRITE on recovery, so NFSv3 I/O
+continues to arrive during the gateway's grace period.  The
+gateway serves it either by opening the file on the backend with
+a non-reclaim OPEN, which <a href="#before-complete" class="auto internal xref">Section 5.5</a> permits before
+RECLAIM_COMPLETE, or with a special stateid.<a href="#section-6.5-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="gateway-nfsv4">
+<section id="section-6.6">
+        <h3 id="name-nfsv4-front-side-clients">
+<a href="#section-6.6" class="section-number selfRef">6.6. </a><a href="#name-nfsv4-front-side-clients" class="section-name selfRef">NFSv4 Front-Side Clients</a>
+        </h3>
+<p id="section-6.6-1">An NFSv4 client learns of the gateway's restart from
+NFS4ERR_BADSESSION or NFS4ERR_STALE_CLIENTID, as it would from any
+server, and reclaims during the gateway's grace period.  The
+gateway maps a front-side OPEN with CLAIM_PREVIOUS to a back-side
+OPEN with CLAIM_PREVIOUS under the derived open-owner, and a
+front-side lock reclaim to a back-side LOCK with the reclaim field
+set under the reclaimed open, as for NLM.  Share deny modes
+survive the restart if the gateway passed them through.<a href="#section-6.6-1" class="pilcrow">¶</a></p>
+<p id="section-6.6-2">The gateway sends the back-side RECLAIM_COMPLETE when every
+front-side client in its record of clients permitted to reclaim
+has sent its own RECLAIM_COMPLETE, or when the front-side grace
+timer ends, whichever comes first.  NFSv4.0 clients have no
+RECLAIM_COMPLETE, so for a gateway that serves them the timer
+governs.<a href="#section-6.6-2" class="pilcrow">¶</a></p>
+<p id="section-6.6-3">A gateway <span class="bcp14">MUST NOT</span> grant a delegation to a front-side client on
+the strength of this extension.  A front-side client holding a
+write delegation has opens and locks that neither the gateway nor
+the backend knows about.  After a gateway restart, that delegation
+can be honored only if the backend guaranteed that no conflicting
+access occurred in the interim, which requires a back-side
+delegation retained under CLAIM_DELEGATE_PREV (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-10.2.1" class="relref">Section 10.2.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  A future document may permit a gateway to grant a
+front-side delegation on that condition.<a href="#section-6.6-3" class="pilcrow">¶</a></p>
+<p id="section-6.6-4">The prohibition covers front-side grants only.  A gateway <span class="bcp14">MAY</span> hold
+back-side delegations for its own use, in the arrangement that
+<span><a href="https://rfc-editor.org/rfc/rfc9754#section-5.1" class="relref">Section 5.1</a> of [<a href="#RFC9754" class="cite xref">RFC9754</a>]</span> describes for an NFSv3 server that is
+an NFSv4.2 client.  This extension does not retain those
+delegations (<a href="#retain" class="auto internal xref">Section 5.2</a>), so a gateway restart loses them.<a href="#section-6.6-4" class="pilcrow">¶</a></p>
+<p id="section-6.6-5"><span><a href="https://rfc-editor.org/rfc/rfc8881#section-10.4.2" class="relref">Section 10.4.2</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> has a client that holds a write
+delegation perform lock operations locally.  A gateway that did
+so with its front-side clients' locks would create no derived
+state for them: the delegation would be their only protection at
+the backend, and the delegation is not retained.  After a restart
+there would be nothing to reclaim, and direct clients would have
+been free to take conflicting locks once the delegation was gone.
+A gateway that uses this extension <span class="bcp14">MUST</span> therefore create derived
+opens and locks at the backend for its front-side clients' opens
+and locks even while it holds a delegation on the file.<a href="#section-6.6-5" class="pilcrow">¶</a></p>
+<p id="section-6.6-6">A gateway that holds a back-side delegation with delegated
+timestamps (<span><a href="https://rfc-editor.org/rfc/rfc9754#section-5" class="relref">Section 5</a> of [<a href="#RFC9754" class="cite xref">RFC9754</a>]</span>) is the authority for the
+file's access and modify times until it returns the delegation,
+and a restart loses the values only the gateway held.  Access
+times for reads the gateway served from its cache are lost.
+Modify times the gateway reported to its clients for data it had
+already written may differ from the backend's own modify time for
+those writes, so that after the restart front-side clients see
+the modify time change with no other writer, and an NFSv3 client
+treats that as a changed file and drops its cached data.  No data
+is lost in either case.  A time that a front-side client set
+explicitly with a SETATTR is different: if the gateway absorbed it
+under the delegation and then restarted, the time is lost although
+the gateway acknowledged it, and an NFSv3 server is required to
+recover without data loss (<span><a href="https://rfc-editor.org/rfc/rfc1813#section-4.8" class="relref">Section 4.8</a> of [<a href="#RFC1813" class="cite xref">RFC1813</a>]</span>).  A
+gateway <span class="bcp14">MUST</span> send an explicit time
+change to the backend before it replies to the front-side client
+that requested it.<a href="#section-6.6-6" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="gateway-backend-restart">
+<section id="section-6.7">
+        <h3 id="name-backend-restart">
+<a href="#section-6.7" class="section-number selfRef">6.7. </a><a href="#name-backend-restart" class="section-name selfRef">Backend Restart</a>
+        </h3>
+<p id="section-6.7-1">When the backend restarts and the gateway does not, the gateway
+holds all of its derived state in memory and reclaims it during
+the backend's grace period as any NFSv4 client does.  Front-side
+clients are not notified.  During the backend's grace period, the
+backend returns NFS4ERR_GRACE for new locking requests and for
+I/O, and the gateway maps that to what each front-side protocol
+can express: NLM4_DENIED_GRACE_PERIOD for NLM, NFS3ERR_JUKEBOX for
+NFSv3 I/O, and NFS4ERR_GRACE for NFSv4.  If the gateway cannot
+reclaim some derived state, for example because it was partitioned
+from the backend through the backend's grace period, the
+front-side state that derived state stood for is no longer
+protected, and the gateway reports the loss as <a href="#lost" class="auto internal xref">Section 6.8</a> describes.<a href="#section-6.7-1" class="pilcrow">¶</a></p>
+<p id="section-6.7-2">When both the gateway and the backend restart, the backend is in
+its ordinary grace period and holds no retained state.  It sets
+EXCHGID4_FLAG_RECLAIMABLE_R if it is in its grace period and has
+the gateway's client owner on record, so the gateway follows the
+sequence in <a href="#gateway-reclaim" class="auto internal xref">Section 6.4</a> and forwards front-side reclaims,
+which the backend treats as ordinary reclaims.  If the backend's
+grace period ended before the gateway returned, the flag is clear
+and the gateway refuses every reclaim.  If the backend's grace
+period ends while the gateway is still forwarding reclaims, the
+remaining back-side reclaims fail with NFS4ERR_NO_GRACE and the
+gateway refuses the corresponding front-side reclaims.
+Continuity in this case therefore depends on the backend's grace
+period outlasting the gateway's, which <a href="#grace" class="auto internal xref">Section 5.8</a> recommends but
+<span>[<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> does not promise.  The safety rule of
+<a href="#gateway-reclaim" class="auto internal xref">Section 6.4</a> holds regardless: nothing is re-granted on the
+front side without a successful back-side reclaim.<a href="#section-6.7-2" class="pilcrow">¶</a></p>
+<p id="section-6.7-3">When the backend restarts during the gateway's reclaim interval,
+the gateway has not restarted again.  It observes the backend
+restart, establishes a new client ID, and reclaims the derived
+state it has already recovered as any client does.  Front-side
+reclaims still arriving are forwarded as ordinary reclaims.  The
+gateway sends RECLAIM_COMPLETE to the new backend instance when
+its front-side grace period ends.  The same safety rule decides
+each reclaim.<a href="#section-6.7-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="lost">
+<section id="section-6.8">
+        <h3 id="name-reporting-lost-state">
+<a href="#section-6.8" class="section-number selfRef">6.8. </a><a href="#name-reporting-lost-state" class="section-name selfRef">Reporting Lost State</a>
+        </h3>
+<p id="section-6.8-1">A front-side client's state is lost when the backend released or
+revoked the corresponding derived state after the absence limit
+or the reclaim cap was reached, when an administrator released it,
+when a back-side reclaim was refused, or when the gateway's lease
+on the backend expired during a partition and the backend revoked
+the state.  In the last case the front-side clients renewed their
+own leases with the gateway throughout and did nothing wrong, yet
+their state is gone.<a href="#section-6.8-1" class="pilcrow">¶</a></p>
+<p id="section-6.8-2">To an NFSv4 front-side client, the gateway reports the loss with
+the mechanisms <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> provides: the
+affected stateids are revoked, and the SEQ4_STATUS flags in the
+next SEQUENCE reply tell the client that some of its state has
+been revoked.<a href="#section-6.8-2" class="pilcrow">¶</a></p>
+<p id="section-6.8-3">To an NLM client, the gateway has no way to report a loss other
+than to deny the client's reclaim after SM_NOTIFY.  NLM provides
+no notification for a lock lost while the client was not
+reclaiming.  This is a limitation of NLM, which this document
+records and does not fix.<a href="#section-6.8-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
