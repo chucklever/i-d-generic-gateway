@@ -2045,7 +2045,70 @@ remember what it had revoked (<a href="#reclaim" class="auto internal xref">Sect
         <h3 id="name-interaction-with-the-server">
 <a href="#section-5.8" class="section-number selfRef">5.8. </a><a href="#name-interaction-with-the-server" class="section-name selfRef">Interaction with the Server's Grace Period</a>
         </h3>
-<p id="section-5.8-1">TODO Interaction with the Server's Grace Period<a href="#section-5.8-1" class="pilcrow">¶</a></p>
+<p id="section-5.8-1">Retention operates while the server is running normally.  This
+subsection specifies what happens when the server itself restarts
+while it holds retained state, or while a new instance of a
+retaining client is reclaiming.<a href="#section-5.8-1" class="pilcrow">¶</a></p>
+<p id="section-5.8-2">A server is not required to preserve retained state across a
+restart of the server.  Where it does not, a server restart
+converts the situation into one that <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.2" class="relref">Section 8.4.2</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>
+already covers, as follows.<a href="#section-5.8-2" class="pilcrow">¶</a></p>
+<p id="section-5.8-3">If the server restarts during an absence interval, the retaining
+client has not yet returned.  When it does, the server is in its
+grace period or has left it, and the state of the retaining
+client is gone.  The new instance sends EXCHANGE_ID with
+EXCHGID4_FLAG_RETAIN_STATE as usual.  If the server is in its
+grace period and its stable storage lists the client owner as
+permitted to reclaim, the server sets
+EXCHGID4_FLAG_RECLAIMABLE_R, and the client's reclaims are
+ordinary grace-period reclaims, which is the first case in the
+order of <a href="#reclaim" class="auto internal xref">Section 5.4</a>.  If the server's grace period has ended,
+the flag is clear and the client has nothing to reclaim.<a href="#section-5.8-3" class="pilcrow">¶</a></p>
+<p id="section-5.8-4">If the server restarts during a reclaim interval, the new instance
+of the retaining client has not restarted again.  It observes the
+server restart as any client does, establishes a new client ID,
+and reclaims during the server's grace period the state it had
+already recovered.  Reclaims it has not yet made become ordinary
+grace-period reclaims.  It sends RECLAIM_COMPLETE when it has
+finished, which for a gateway is when its front-side grace period
+ends.<a href="#section-5.8-4" class="pilcrow">¶</a></p>
+<p id="section-5.8-5">The point at which a server records a retaining client's lease
+expiry in stable storage, specified in <a href="#retain" class="auto internal xref">Section 5.2</a>, matters here.
+<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> has a server make that record so
+that, after a server restart, a reclaim from a client whose lease
+had expired is rejected with NFS4ERR_NO_GRACE, because another
+client could have acquired a conflicting lock in the meantime.  A
+retaining client whose state was still retained when the server
+restarted had no such lease expiry, since nothing conflicting was
+granted, and the server has made no record.  A retaining client
+therefore remains eligible to reclaim across a server restart for
+the whole of an absence interval, although its lease expired
+during that interval.<a href="#section-5.8-5" class="pilcrow">¶</a></p>
+<p id="section-5.8-6">RFC 8881 does not promise that a server's grace period outlasts a
+gateway's.  <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.2.1" class="relref">Section 8.4.2.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> says that "the server
+may also terminate the grace period before all clients have done
+a global RECLAIM_COMPLETE".  A gateway that returns after the
+server's grace period has ended, or whose front-side reclaims are
+still arriving when it ends, cannot recover the remainder.  To
+make that outcome rare, a server <span class="bcp14">SHOULD</span> record in stable storage
+that a client owner is a retaining client, and <span class="bcp14">SHOULD</span> hold its
+grace period open until that client owner has sent
+RECLAIM_COMPLETE, bounded by the absence limit while the client
+has not returned and by the reclaim cap once it has.
+<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.2.1" class="relref">Section 8.4.2.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> already permits a grace period
+that lasts until every known client has completed its reclaims.<a href="#section-5.8-6" class="pilcrow">¶</a></p>
+<p id="section-5.8-7">These are recommendations rather than requirements because holding
+the grace period open delays every client of the server, by up to
+the absence limit when the retaining client never returns.  A
+server operator has to be able to decline that cost.  What the
+protocol cannot leave to policy is safety: a gateway grants a
+front-side reclaim only when the corresponding back-side reclaim
+succeeded, as <a href="#gateway-reclaim" class="auto internal xref">Section 6.2</a> specifies, so a server that
+ends its grace period early causes a front-side client to be told
+that its state is lost, and never causes state to be re-granted
+without protection.  Continuity across a restart of both the
+gateway and the server is therefore best effort, and safety is
+not.<a href="#section-5.8-7" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
