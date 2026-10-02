@@ -96,6 +96,12 @@ Table of Contents
      6.7.  Backend Restart
      6.8.  Reporting Lost State
    7.  Backend Server Behavior
+     7.1.  Choosing the Limits
+     7.2.  Resource Limits
+     7.3.  Administrative Release
+     7.4.  Stable Storage
+     7.5.  Several Retaining Clients
+     7.6.  Effect on Direct Clients
    8.  XDR Description
    9.  Security Considerations
    10. IANA Considerations
@@ -1160,7 +1166,101 @@ Table of Contents
 
 7.  Backend Server Behavior
 
-   TODO Backend Server Behavior
+   Section 5 specifies what a server does for a retaining client.  This
+   section covers the choices a server makes in doing so, and their
+   effect on the server's other clients.
+
+7.1.  Choosing the Limits
+
+   The absence limit bounds how long a gateway that has not returned
+   blocks direct clients.  It needs to be long enough to cover a reboot
+   of the gateway host, and short enough that an operator can tolerate
+   it when the gateway does not come back.  A server SHOULD make the
+   absence limit configurable.
+
+   The reclaim cap bounds how long a gateway that has returned but not
+   completed blocks direct clients from state it is not going to
+   reclaim.  A gateway's front-side grace period is typically at least
+   one lease period of the gateway, and a cap shorter than that causes
+   late front-side reclaims to be refused and their clients told that
+   state is lost.  A server SHOULD make the reclaim cap configurable,
+   and its default SHOULD be no shorter than the server's own lease
+   period.  Because neither limit is advertised (Section 5.3), an
+   operator who runs a gateway against a server sets the gateway's
+   front-side grace period with the server's reclaim cap in mind.
+
+7.2.  Resource Limits
+
+   Retained state occupies server resources after the lease that would
+   have released it has expired.  A server MAY limit the amount of state
+   it retains, per retaining client or in total.  When a server declines
+   to retain state because of a resource limit, it releases that state
+   as it would for a client that was not a retaining client, and a later
+   reclaim for it receives NFS4ERR_RECLAIM_BAD or NFS4ERR_NO_GRACE
+   (Section 5.4).  A server that cannot retain the state of a client
+   owner at all SHOULD decline retention at EXCHANGE_ID (Section 5.1)
+   rather than accept and then release.
+
+7.3.  Administrative Release
+
+   An operator may need to release retained state before a limit is
+   reached, for example when a gateway is known not to be returning.  A
+   server SHOULD provide a way to release the retained state of a client
+   owner.  Administrative release has the effect of a limit reached
+   followed by immediate release (Section 5.3), and the server makes the
+   stable-storage record of Section 5.2 at that point.
+
+   What the gateway's front-side clients then see depends on whether
+   their state had been reclaimed.  For state not yet reclaimed, the
+   gateway's later reclaim is refused and the gateway denies the front-
+   side reclaim, which both NFSv4 and NLM can express.  For state the
+   new instance had already reclaimed, administrative release is
+   ordinary revocation of a live client's state, which the gateway
+   reports to NFSv4 clients as Section 6.8 describes and cannot report
+   to NLM clients at all.
+
+7.4.  Stable Storage
+
+   Section 5.2 requires a server to make the lease-expired record of
+   Section 8.4.3 of [RFC8881] when it releases or revokes retained state
+   rather than at lease expiry.  For state released at a limit or
+   administratively, the record is made at release.  For state a server
+   chooses to keep past a limit, the record MUST be made when the server
+   first grants a request that conflicts with that state, because from
+   that moment another client may hold a conflicting lock, which is the
+   condition the record exists to capture.  A server for which that
+   bookkeeping is impractical releases retained state outright when a
+   limit is reached, which Section 5.3 permits.
+
+   A server that follows the recommendation of Section 5.8 also records
+   that a client owner is a retaining client, so that after a server
+   restart it can hold its grace period open for that client owner.
+
+7.5.  Several Retaining Clients
+
+   A server may have more than one retaining client, for example two
+   gateways that export the same file system, or a gateway and another
+   client that can reconstruct its state.  Retention is per client
+   owner.  Each retaining client's state is retained, bounded, and
+   released independently, and the retained state of one blocks the
+   others exactly as it blocks direct clients.  Nothing in this
+   extension coordinates the recovery of one retaining client with
+   another.
+
+7.6.  Effect on Direct Clients
+
+   A direct client whose request conflicts with retained state receives
+   NFS4ERR_SHARE_DENIED or NFS4ERR_DENIED (Section 5.2).  A direct
+   client can already receive both errors, so a direct client needs no
+   change to operate against a server that implements this extension.
+   What changes is duration: a conflict that Section 8.4.3 of [RFC8881]
+   would have resolved in the direct client's favor at the retaining
+   client's lease expiry now persists until a reclaim moves the state to
+   the new instance, a limit is reached, or the state is released.  A
+   direct client that blocks on a byte-range lock, as Section 9.6 of
+   [RFC8881] allows, waits accordingly.  The limits in Section 7.1 are
+   how an operator bounds that cost, and Section 9 considers it as a
+   denial of service.
 
 8.  XDR Description
 

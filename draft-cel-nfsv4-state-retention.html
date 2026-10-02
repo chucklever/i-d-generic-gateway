@@ -1230,6 +1230,26 @@ permit the new instance of that client to reclaim that state.<a href="#section-a
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7">
             <p id="section-toc.1-1.7.1"><a href="#section-7" class="auto internal xref">7</a>.  <a href="#name-backend-server-behavior" class="internal xref">Backend Server Behavior</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.1">
+                <p id="section-toc.1-1.7.2.1.1"><a href="#section-7.1" class="auto internal xref">7.1</a>.  <a href="#name-choosing-the-limits" class="internal xref">Choosing the Limits</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.2">
+                <p id="section-toc.1-1.7.2.2.1"><a href="#section-7.2" class="auto internal xref">7.2</a>.  <a href="#name-resource-limits" class="internal xref">Resource Limits</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.3">
+                <p id="section-toc.1-1.7.2.3.1"><a href="#section-7.3" class="auto internal xref">7.3</a>.  <a href="#name-administrative-release" class="internal xref">Administrative Release</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.4">
+                <p id="section-toc.1-1.7.2.4.1"><a href="#section-7.4" class="auto internal xref">7.4</a>.  <a href="#name-stable-storage-2" class="internal xref">Stable Storage</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.5">
+                <p id="section-toc.1-1.7.2.5.1"><a href="#section-7.5" class="auto internal xref">7.5</a>.  <a href="#name-several-retaining-clients" class="internal xref">Several Retaining Clients</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7.2.6">
+                <p id="section-toc.1-1.7.2.6.1"><a href="#section-7.6" class="auto internal xref">7.6</a>.  <a href="#name-effect-on-direct-clients" class="internal xref">Effect on Direct Clients</a></p>
+</li>
+            </ul>
 </li>
           <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8">
             <p id="section-toc.1-1.8.1"><a href="#section-8" class="auto internal xref">8</a>.  <a href="#name-xdr-description" class="internal xref">XDR Description</a></p>
@@ -2500,12 +2520,130 @@ records and does not fix.<a href="#section-6.8-3" class="pilcrow">¶</a></p>
 </div>
 </section>
 </div>
-<div id="backend-server-behavior">
+<div id="backend">
 <section id="section-7">
       <h2 id="name-backend-server-behavior">
 <a href="#section-7" class="section-number selfRef">7. </a><a href="#name-backend-server-behavior" class="section-name selfRef">Backend Server Behavior</a>
       </h2>
-<p id="section-7-1">TODO Backend Server Behavior<a href="#section-7-1" class="pilcrow">¶</a></p>
+<p id="section-7-1"><a href="#extension" class="auto internal xref">Section 5</a> specifies what a server does for a retaining
+client.  This section covers the choices a server makes in doing
+so, and their effect on the server's other clients.<a href="#section-7-1" class="pilcrow">¶</a></p>
+<div id="limit-values">
+<section id="section-7.1">
+        <h3 id="name-choosing-the-limits">
+<a href="#section-7.1" class="section-number selfRef">7.1. </a><a href="#name-choosing-the-limits" class="section-name selfRef">Choosing the Limits</a>
+        </h3>
+<p id="section-7.1-1">The absence limit bounds how long a gateway that has not returned
+blocks direct clients.  It needs to be long enough to cover a
+reboot of the gateway host, and short enough that an operator can
+tolerate it when the gateway does not come back.  A server
+<span class="bcp14">SHOULD</span> make the absence limit configurable.<a href="#section-7.1-1" class="pilcrow">¶</a></p>
+<p id="section-7.1-2">The reclaim cap bounds how long a gateway that has returned but
+not completed blocks direct clients from state it is not going to
+reclaim.  A gateway's front-side grace period is typically at
+least one lease period of the gateway, and a cap shorter than
+that causes late front-side reclaims to be refused and their
+clients told that state is lost.  A server <span class="bcp14">SHOULD</span> make the reclaim
+cap configurable, and its default <span class="bcp14">SHOULD</span> be no shorter than the
+server's own lease period.  Because neither limit is advertised
+(<a href="#limits" class="auto internal xref">Section 5.3</a>), an operator who runs a gateway against a server
+sets the gateway's front-side grace period with the server's
+reclaim cap in mind.<a href="#section-7.1-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="resources">
+<section id="section-7.2">
+        <h3 id="name-resource-limits">
+<a href="#section-7.2" class="section-number selfRef">7.2. </a><a href="#name-resource-limits" class="section-name selfRef">Resource Limits</a>
+        </h3>
+<p id="section-7.2-1">Retained state occupies server resources after the lease that
+would have released it has expired.  A server <span class="bcp14">MAY</span> limit the amount
+of state it retains, per retaining client or in total.  When a
+server declines to retain state because of a resource limit, it
+releases that state as it would for a client that was not a
+retaining client, and a later reclaim for it receives
+NFS4ERR_RECLAIM_BAD or NFS4ERR_NO_GRACE (<a href="#reclaim" class="auto internal xref">Section 5.4</a>).  A server
+that cannot retain the state of a client owner at all <span class="bcp14">SHOULD</span>
+decline retention at EXCHANGE_ID (<a href="#negotiate" class="auto internal xref">Section 5.1</a>) rather than
+accept and then release.<a href="#section-7.2-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="admin">
+<section id="section-7.3">
+        <h3 id="name-administrative-release">
+<a href="#section-7.3" class="section-number selfRef">7.3. </a><a href="#name-administrative-release" class="section-name selfRef">Administrative Release</a>
+        </h3>
+<p id="section-7.3-1">An operator may need to release retained state before a limit is
+reached, for example when a gateway is known not to be returning.
+A server <span class="bcp14">SHOULD</span> provide a way to release the retained state of a
+client owner.  Administrative release has the effect of a limit
+reached followed by immediate release (<a href="#limits" class="auto internal xref">Section 5.3</a>), and the server
+makes the stable-storage record of <a href="#retain" class="auto internal xref">Section 5.2</a> at that point.<a href="#section-7.3-1" class="pilcrow">¶</a></p>
+<p id="section-7.3-2">What the gateway's front-side clients then see depends on whether
+their state had been reclaimed.  For state not yet reclaimed, the
+gateway's later reclaim is refused and the gateway denies the
+front-side reclaim, which both NFSv4 and NLM can express.  For
+state the new instance had already reclaimed, administrative
+release is ordinary revocation of a live client's state, which the
+gateway reports to NFSv4 clients as <a href="#lost" class="auto internal xref">Section 6.8</a> describes and cannot
+report to NLM clients at all.<a href="#section-7.3-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="backend-stable">
+<section id="section-7.4">
+        <h3 id="name-stable-storage-2">
+<a href="#section-7.4" class="section-number selfRef">7.4. </a><a href="#name-stable-storage-2" class="section-name selfRef">Stable Storage</a>
+        </h3>
+<p id="section-7.4-1"><a href="#retain" class="auto internal xref">Section 5.2</a> requires a server to make the lease-expired record of
+<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> when it releases or revokes retained
+state rather than at lease expiry.  For state released at a limit
+or administratively, the record is made at release.  For state a
+server chooses to keep past a limit, the record <span class="bcp14">MUST</span> be made when
+the server first grants a request that conflicts with that state,
+because from that moment another client may hold a conflicting
+lock, which is the condition the record exists to capture.  A
+server for which that bookkeeping is impractical releases retained
+state outright when a limit is reached, which <a href="#limits" class="auto internal xref">Section 5.3</a> permits.<a href="#section-7.4-1" class="pilcrow">¶</a></p>
+<p id="section-7.4-2">A server that follows the recommendation of <a href="#grace" class="auto internal xref">Section 5.8</a> also records
+that a client owner is a retaining client, so that after a server
+restart it can hold its grace period open for that client owner.<a href="#section-7.4-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="several">
+<section id="section-7.5">
+        <h3 id="name-several-retaining-clients">
+<a href="#section-7.5" class="section-number selfRef">7.5. </a><a href="#name-several-retaining-clients" class="section-name selfRef">Several Retaining Clients</a>
+        </h3>
+<p id="section-7.5-1">A server may have more than one retaining client, for example two
+gateways that export the same file system, or a gateway and
+another client that can reconstruct its state.  Retention is per
+client owner.  Each retaining client's state is retained, bounded,
+and released independently, and the retained state of one blocks
+the others exactly as it blocks direct clients.  Nothing in this
+extension coordinates the recovery of one retaining client with
+another.<a href="#section-7.5-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="direct">
+<section id="section-7.6">
+        <h3 id="name-effect-on-direct-clients">
+<a href="#section-7.6" class="section-number selfRef">7.6. </a><a href="#name-effect-on-direct-clients" class="section-name selfRef">Effect on Direct Clients</a>
+        </h3>
+<p id="section-7.6-1">A direct client whose request conflicts with retained state
+receives NFS4ERR_SHARE_DENIED or NFS4ERR_DENIED (<a href="#retain" class="auto internal xref">Section 5.2</a>).  A
+direct client can already receive both errors, so a direct client
+needs no change to operate against a server that implements this
+extension.  What changes is duration: a conflict that
+<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> would have resolved in the direct
+client's favor at the retaining client's lease expiry now persists
+until a reclaim moves the state to the new instance, a limit is
+reached, or the state is released.  A direct client that blocks
+on a byte-range lock, as <span><a href="https://rfc-editor.org/rfc/rfc8881#section-9.6" class="relref">Section 9.6</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> allows, waits
+accordingly.  The limits in <a href="#limit-values" class="auto internal xref">Section 7.1</a> are how an operator
+bounds that cost, and <a href="#security" class="auto internal xref">Section 9</a> considers it as a denial of
+service.<a href="#section-7.6-1" class="pilcrow">¶</a></p>
+</section>
+</div>
 </section>
 </div>
 <div id="xdr">
