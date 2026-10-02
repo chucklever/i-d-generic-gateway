@@ -675,7 +675,44 @@ gateway's back-side client performs I/O.
 
 ## Completing Reclaim {#complete}
 
-TODO Completing Reclaim
+A new instance of a retaining client signals that it has finished
+reclaiming by sending RECLAIM_COMPLETE with rca_one_fs set to
+FALSE, as any client does at the end of its reclaims
+({{Section 18.51 of RFC8881}}).  This extension defines no
+separate completion operation.
+
+When a server receives that RECLAIM_COMPLETE from a retaining
+client, it MUST release all retained state of that client owner
+that has not been reclaimed.  The release ends the reclaim
+interval.  State the instance reclaimed before sending
+RECLAIM_COMPLETE is unaffected: it is ordinary state of a live
+client and remains so.  Retained state released here is state
+whose lease expired without being reclaimed, so this is the point
+at which the server makes the stable-storage record that
+{{retain}} defers from lease expiry.
+
+A RECLAIM_COMPLETE with rca_one_fs set to TRUE pertains to a file
+system transition and has no effect on retained state.
+
+Once released, retained state cannot be reclaimed.  A reclaim-type
+request that arrives after RECLAIM_COMPLETE finds no retained
+state for the client owner and receives NFS4ERR_NO_GRACE, as
+{{reclaim}} specifies.  A gateway whose front-side grace period
+has ended has nothing further to forward, so this case arises only
+from a reclaim that a front-side client sends late, and the
+gateway refuses it as {{gateway-reclaim}} describes.
+
+RECLAIM_COMPLETE from any instance of the client owner releases
+everything retained and not yet reclaimed, including the remainder
+from an earlier instance that restarted before sending its own
+RECLAIM_COMPLETE.  {{retain}} describes how retained state
+accumulates across repeated restarts and how the reclaim cap
+bounds each part of it.
+
+A new instance that learns from the EXCHANGE_ID reply that no
+reclaim can succeed, because EXCHGID4_FLAG_RECLAIMABLE_R is
+clear, sends RECLAIM_COMPLETE at once, as {{Section 18.51.3 of
+RFC8881}} requires of a client that has nothing to reclaim.
 
 ## Errors {#errors}
 
@@ -693,6 +730,10 @@ TODO Gateway Server Behavior
 ## Owner Derivation {#owners}
 
 TODO Owner Derivation
+
+## Restart Sequence {#gateway-reclaim}
+
+TODO Restart Sequence
 
 
 # Backend Server Behavior
