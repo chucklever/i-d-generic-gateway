@@ -105,6 +105,11 @@ Table of Contents
    8.  XDR Description
      8.1.  Extraction of XDR
    9.  Security Considerations
+     9.1.  Denial of Service
+     9.2.  Reclaiming State the Prior Instance Did Not Hold
+     9.3.  Front-Side Identity
+     9.4.  False Assurance
+     9.5.  Transport Security
    10. IANA Considerations
    11. References
      11.1.  Normative References
@@ -1312,7 +1317,112 @@ Table of Contents
 
 9.  Security Considerations
 
-   TODO Security
+   The security considerations of Section 21 of [RFC8881] apply.  This
+   extension changes nothing about how a server authenticates a client
+   or authorizes an operation.  What it changes is how long state
+   outlives the client instance that established it, and who is able to
+   recover that state.  Both raise considerations of their own.
+
+9.1.  Denial of Service
+
+   A retaining client's opens and locks continue to block other clients
+   after its lease expires, for up to the absence limit, and state the
+   new instance never reclaims continues to block them for up to the
+   reclaim cap.  Any client that becomes a retaining client therefore
+   gains the ability to deny access to files for longer than [RFC8881]
+   otherwise permits, whether through a fault or by intent.  Three
+   things bound this.  Both limits are mandatory (Section 5.3), so the
+   exposure is finite and under the server operator's control.  Whether
+   a client owner may be a retaining client is a server policy decision
+   (Section 5.1), and a server SHOULD confine retention to principals
+   that are authorized to act as gateways, so that an arbitrary client
+   cannot opt in.  A server SHOULD require SP4_MACH_CRED state
+   protection for a retaining client, so that only the holder of that
+   client's machine credential can establish the next instance of the
+   client owner and so reclaim, or decline to reclaim, the retained
+   state.
+
+   Administrative release (Section 7.3) is the operator's recourse when
+   a retaining client is not coming back and the absence limit is too
+   long to wait.
+
+9.2.  Reclaiming State the Prior Instance Did Not Hold
+
+   A reclaim succeeds only when it matches retained state of the same
+   client owner under the same owner string (Section 5.4).  A new
+   instance of a retaining client therefore cannot recover state that
+   the prior instance did not hold, and no client can recover another
+   client owner's retained state.  SP4_MACH_CRED, where required, ties
+   the client owner to a credential.
+
+   The server cannot see further than the client owner.  A gateway is
+   one client owner to the server, and the server cannot tell which
+   front-side client a reclaim is for.  Owner matching is a record of
+   who held what, not authentication: a reclaim under the right owner
+   string is honored whichever front-side client presented it to the
+   gateway.  Whether one front-side client can reclaim another's state
+   is decided entirely on the front side, by what the gateway checks
+   before it forwards (Section 6.2).  SP4_MACH_CRED protects the
+   gateway's identity toward the server and says nothing about the
+   identity of the gateway's clients.
+
+9.3.  Front-Side Identity
+
+   A gateway can identify a reclaiming front-side client only as well as
+   the front-side protocol allows.  NFSv4 ties a reclaim to a client ID
+   and to the principal that established it, and a gateway accepts a
+   reclaim only from a client owner in its record of clients permitted
+   to reclaim and under that principal.  NLM identifies the holder of a
+   lock by a caller name and an owner handle that the client supplies,
+   and nothing in NLM authenticates either.  A gateway accepts an NLM
+   reclaim only for a caller in its NSM monitor list, and may bind the
+   entry to an RPC credential or a source address, which is an
+   authenticated binding only under RPCSEC_GSS.
+
+   On an unauthenticated NLM front side, a host that can reach the
+   gateway during its grace period and present another client's caller
+   name and owner handle can reclaim that client's lock.  Any NLM server
+   has this exposure, so a gateway using this extension adds none that
+   NLM deployments do not already accept.  What this extension does not
+   do is remove it: a successful back-side reclaim shows that the owner
+   string matched, not that the right front-side client sent it.
+   Deployments that need stronger assurance use an NFSv4 front side with
+   RPCSEC_GSS, or an NLM front side where the gateway binds reclaims to
+   RPCSEC_GSS credentials.
+
+   Because the back-side owner string is a hash of front-side values
+   (Section 6.2), a collision between two front-side owners makes them
+   one owner on the server.  A conflict between them is not detected,
+   and either can reclaim the other's state.  The hash length SHOULD
+   make an accidental collision negligible, and a gateway on an
+   untrusted front side SHOULD consider whether a front-side client can
+   choose its owner values so as to collide with another's.
+
+9.4.  False Assurance
+
+   A gateway that granted a front-side reclaim without a successful
+   back-side reclaim would tell an application that its lock was
+   protected throughout the gateway's restart when it was not.  The
+   application might then act on data that another client changed in the
+   interim.  Section 6.4 forbids this: a gateway MUST grant a front-side
+   reclaim only when the corresponding back-side reclaim succeeded.  The
+   same rule protects against a server that ended its grace period early
+   (Section 5.8) and against retained state released at a limit: in each
+   case the application learns that its state was lost rather than
+   proceeding on a false assumption.  Local-only deny modes
+   (Section 6.1) are the one place a front-side client receives a weaker
+   guarantee than it may assume, and a front-side client cannot detect
+   that mode.
+
+9.5.  Transport Security
+
+   The connection between a gateway and its backend carries the reclaims
+   that decide whether every front-side client's state survives.  A
+   reclaim that is modified or injected in transit changes which owner
+   recovers which state.  Deployments SHOULD carry that connection over
+   an integrity-protecting channel, such as RPCSEC_GSS with integrity or
+   privacy protection, or RPC over TLS ([RFC9289]).  This extension
+   introduces no requirement on the transport beyond those of [RFC8881].
 
 10.  IANA Considerations
 
@@ -1370,6 +1480,11 @@ Table of Contents
    [RFC7530]  Haynes, T., Ed. and D. Noveck, Ed., "Network File System
               (NFS) Version 4 Protocol", RFC 7530, DOI 10.17487/RFC7530,
               March 2015, <https://www.rfc-editor.org/rfc/rfc7530>.
+
+   [RFC9289]  Myklebust, T. and C. Lever, Ed., "Towards Remote Procedure
+              Call Encryption by Default", RFC 9289,
+              DOI 10.17487/RFC9289, September 2022,
+              <https://www.rfc-editor.org/rfc/rfc9289>.
 
    [RFC9754]  Haynes, T. and T. Myklebust, "Extensions for Opening and
               Delegating Files in NFSv4.2", RFC 9754,
