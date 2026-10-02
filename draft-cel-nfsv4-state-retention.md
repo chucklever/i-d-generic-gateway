@@ -30,6 +30,7 @@ author:
     email: cel-ietf@chucklever.net
 
 normative:
+  RFC4506:
   RFC7862:
   RFC7863:
   RFC8178:
@@ -1291,7 +1292,57 @@ service.
 
 # XDR Description {#xdr}
 
-TODO XDR Description
+This extension adds two constants to the XDR description of
+NFSv4.2 in {{RFC7863}}.  No new data types or operations are
+added, and the XDR of EXCHANGE_ID is unchanged: the new constants
+name bits in the existing eia_flags and eir_flags words.
+
+~~~
+/// /*
+///  * EXCHANGE_ID flags defined by this document.  They are
+///  * used in eia_flags and eir_flags alongside the flags
+///  * defined in RFC 8881 Section 18.35.1 and RFC 7862
+///  * Section 14.1.
+///  */
+/// const EXCHGID4_FLAG_RETAIN_STATE        = 0x00000008;
+/// const EXCHGID4_FLAG_RECLAIMABLE_R       = 0x20000000;
+///
+~~~
+
+EXCHGID4_FLAG_RETAIN_STATE takes the next unassigned bit after the
+capability flags of {{RFC8881}} and {{RFC7862}}, which it
+resembles in being set by the client and echoed by the server.
+EXCHGID4_FLAG_RECLAIMABLE_R takes a bit adjacent to
+EXCHGID4_FLAG_CONFIRMED_R, which it resembles in being set only
+by the server.  {{negotiate}} specifies the use of both.
+
+## Extraction of XDR {#extract}
+
+The XDR description is embedded in this document in a way that
+makes it simple for the reader to extract into a ready-to-compile
+form, following the practice of {{RFC7863}} and {{RFC9754}}.  The
+reader can feed this document into the following shell script to
+produce the machine-readable XDR description of the new
+constants:
+
+~~~
+#!/bin/sh
+grep '^ *///' $* | sed 's?^ */// ??' | sed 's?^ *///$??'
+~~~
+
+That is, if the above script is stored in a file called
+"extract.sh" and this document is in a file called "spec.txt",
+then the reader can do the following:
+
+~~~
+sh extract.sh < spec.txt > state_retention_prot.x
+~~~
+
+The effect of the script is to remove leading blank space from
+each line, plus a sentinel sequence of "///".  The extracted
+constants are written in the XDR language of {{RFC4506}} and
+belong with the EXCHANGE_ID constants in the nfs4_prot.x file
+generated from {{RFC7863}}.
 
 
 # Security Considerations {#security}
