@@ -103,6 +103,7 @@ Table of Contents
      7.5.  Several Retaining Clients
      7.6.  Effect on Direct Clients
    8.  XDR Description
+     8.1.  Extraction of XDR
    9.  Security Considerations
    10. IANA Considerations
    11. References
@@ -1264,7 +1265,50 @@ Table of Contents
 
 8.  XDR Description
 
-   TODO XDR Description
+   This extension adds two constants to the XDR description of NFSv4.2
+   in [RFC7863].  No new data types or operations are added, and the XDR
+   of EXCHANGE_ID is unchanged: the new constants name bits in the
+   existing eia_flags and eir_flags words.
+
+   /// /*
+   ///  * EXCHANGE_ID flags defined by this document.  They are
+   ///  * used in eia_flags and eir_flags alongside the flags
+   ///  * defined in RFC 8881 Section 18.35.1 and RFC 7862
+   ///  * Section 14.1.
+   ///  */
+   /// const EXCHGID4_FLAG_RETAIN_STATE        = 0x00000008;
+   /// const EXCHGID4_FLAG_RECLAIMABLE_R       = 0x20000000;
+   ///
+
+   EXCHGID4_FLAG_RETAIN_STATE takes the next unassigned bit after the
+   capability flags of [RFC8881] and [RFC7862], which it resembles in
+   being set by the client and echoed by the server.
+   EXCHGID4_FLAG_RECLAIMABLE_R takes a bit adjacent to
+   EXCHGID4_FLAG_CONFIRMED_R, which it resembles in being set only by
+   the server.  Section 5.1 specifies the use of both.
+
+8.1.  Extraction of XDR
+
+   The XDR description is embedded in this document in a way that makes
+   it simple for the reader to extract into a ready-to-compile form,
+   following the practice of [RFC7863] and [RFC9754].  The reader can
+   feed this document into the following shell script to produce the
+   machine-readable XDR description of the new constants:
+
+   #!/bin/sh
+   grep '^ *///' $* | sed 's?^ */// ??' | sed 's?^ *///$??'
+
+   That is, if the above script is stored in a file called "extract.sh"
+   and this document is in a file called "spec.txt", then the reader can
+   do the following:
+
+   sh extract.sh < spec.txt > state_retention_prot.x
+
+   The effect of the script is to remove leading blank space from each
+   line, plus a sentinel sequence of "///".  The extracted constants are
+   written in the XDR language of [RFC4506] and belong with the
+   EXCHANGE_ID constants in the nfs4_prot.x file generated from
+   [RFC7863].
 
 9.  Security Considerations
 
@@ -1282,6 +1326,10 @@ Table of Contents
               Requirement Levels", BCP 14, RFC 2119,
               DOI 10.17487/RFC2119, March 1997,
               <https://www.rfc-editor.org/rfc/rfc2119>.
+
+   [RFC4506]  Eisler, M., Ed., "XDR: External Data Representation
+              Standard", STD 67, RFC 4506, DOI 10.17487/RFC4506, May
+              2006, <https://www.rfc-editor.org/rfc/rfc4506>.
 
    [RFC7862]  Haynes, T., "Network File System (NFS) Version 4 Minor
               Version 2 Protocol", RFC 7862, DOI 10.17487/RFC7862,
