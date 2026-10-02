@@ -1174,7 +1174,10 @@ permit the new instance of that client to reclaim that state.<a href="#section-a
             <p id="section-toc.1-1.5.1"><a href="#section-5" class="auto internal xref">5</a>.  <a href="#name-protocol-extension" class="internal xref">Protocol Extension</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.1">
-                <p id="section-toc.1-1.5.2.1.1"><a href="#section-5.1" class="auto internal xref">5.1</a>.  <a href="#name-intervals-and-limits" class="internal xref">Intervals and Limits</a></p>
+                <p id="section-toc.1-1.5.2.1.1"><a href="#section-5.1" class="auto internal xref">5.1</a>.  <a href="#name-capability-negotiation" class="internal xref">Capability Negotiation</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5.2.2">
+                <p id="section-toc.1-1.5.2.2.1"><a href="#section-5.2" class="auto internal xref">5.2</a>.  <a href="#name-intervals-and-limits" class="internal xref">Intervals and Limits</a></p>
 </li>
             </ul>
 </li>
@@ -1580,21 +1583,109 @@ reclaim-type requests from this client owner can succeed once the
 new client ID is confirmed.  The flag is a hint that lets a
 gateway decide whether to run a front-side grace period at all.
 It is not proof that any particular item of state was retained.<a href="#section-5-3" class="pilcrow">¶</a></p>
-<div id="limits">
+<div id="negotiate">
 <section id="section-5.1">
-        <h3 id="name-intervals-and-limits">
-<a href="#section-5.1" class="section-number selfRef">5.1. </a><a href="#name-intervals-and-limits" class="section-name selfRef">Intervals and Limits</a>
+        <h3 id="name-capability-negotiation">
+<a href="#section-5.1" class="section-number selfRef">5.1. </a><a href="#name-capability-negotiation" class="section-name selfRef">Capability Negotiation</a>
         </h3>
-<p id="section-5.1-1">Retained state blocks other clients, so a server bounds how long
-it enforces that state.  Two intervals are bounded separately.<a href="#section-5.1-1" class="pilcrow">¶</a></p>
-<p id="section-5.1-2">The absence interval runs from expiry of the old instance's lease
+<p id="section-5.1-1">This extension defines two flags in the EXCHANGE_ID flag word,
+using bits that <span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.35.1" class="relref">Section 18.35.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> leaves unassigned.
+<a href="#xdr" class="auto internal xref">Section 8</a> gives their values.<a href="#section-5.1-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-5.1-2">
+          <dt id="section-5.1-2.1">EXCHGID4_FLAG_RETAIN_STATE:</dt>
+          <dd style="margin-left: 1.5em" id="section-5.1-2.2">
+            <p id="section-5.1-2.2.1">A client sets this flag in eia_flags to request that the server
+retain the state of the client owner across a restart.  A server
+sets this flag in eir_flags when it will do so.  A client whose
+client ID was established by an EXCHANGE_ID in which both the
+request and the reply carried this flag is a retaining client.<a href="#section-5.1-2.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-5.1-2.3">EXCHGID4_FLAG_RECLAIMABLE_R:</dt>
+          <dd style="margin-left: 1.5em" id="section-5.1-2.4">
+            <p id="section-5.1-2.4.1">A server sets this flag in eir_flags when reclaim-type requests
+from this client owner can succeed once the new client ID is
+confirmed.  A client <span class="bcp14">MUST NOT</span> set this flag in eia_flags.<a href="#section-5.1-2.4.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-5.1-3">A server <span class="bcp14">MUST NOT</span> set either flag in eir_flags unless the request
+set EXCHGID4_FLAG_RETAIN_STATE.  The request flag is how the
+server knows, before it sends an extended reply, that the client
+is aware of the extension (<span><a href="https://rfc-editor.org/rfc/rfc8178#section-6" class="relref">Section 6</a> of [<a href="#RFC8178" class="cite xref">RFC8178</a>]</span>).<a href="#section-5.1-3" class="pilcrow">¶</a></p>
+<p id="section-5.1-4">A server that does not implement this extension rejects an
+EXCHANGE_ID that sets EXCHGID4_FLAG_RETAIN_STATE with
+NFS4ERR_INVAL, as <span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.35.3" class="relref">Section 18.35.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> requires for an
+unassigned flag bit.  A client that receives NFS4ERR_INVAL <span class="bcp14">MUST</span>
+retry the EXCHANGE_ID without the flag.  If the retry succeeds,
+the client knows that the flag was the cause of the error and that
+the server does not support retention.  The retry is necessary
+because EXCHANGE_ID returns NFS4ERR_INVAL for other reasons as
+well (<span><a href="https://rfc-editor.org/rfc/rfc8178#section-4.4.3" class="relref">Section 4.4.3</a> of [<a href="#RFC8178" class="cite xref">RFC8178</a>]</span>).<a href="#section-5.1-4" class="pilcrow">¶</a></p>
+<p id="section-5.1-5">Whether to retain state for a client owner is a server policy
+decision.  A server that implements this extension <span class="bcp14">MAY</span> decline
+the request.  A server that declines clears
+EXCHGID4_FLAG_RETAIN_STATE in eir_flags and treats the client
+owner as <span>[<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> specifies.  Any client that becomes a
+retaining client can hold opens and locks past lease expiry for
+the whole absence limit, so a server <span class="bcp14">SHOULD</span> restrict retention to
+principals that are authorized to act as gateways.  A server
+<span class="bcp14">SHOULD</span> require that a retaining client use the SP4_MACH_CRED state
+protection mode, so that only the holder of the client's machine
+credential can establish the next instance of that client owner
+and reclaim its state.  <a href="#security" class="auto internal xref">Section 9</a> discusses both points.<a href="#section-5.1-5" class="pilcrow">¶</a></p>
+<p id="section-5.1-6">A server records that a client owner is a retaining client along
+with the rest of the client owner's record, so that the server
+knows at lease expiry how to treat the state of that client owner.<a href="#section-5.1-6" class="pilcrow">¶</a></p>
+<p id="section-5.1-7">A server sets EXCHGID4_FLAG_RECLAIMABLE_R in each of three cases:<a href="#section-5.1-7" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-5.1-8.1">
+            <p id="section-5.1-8.1.1">The server holds retained state from a prior instance of this
+client owner whose lease has expired.<a href="#section-5.1-8.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-5.1-8.2">
+            <p id="section-5.1-8.2.1">The server holds state of a prior instance of this client owner
+whose lease has not expired, and will retain that state when
+CREATE_SESSION confirms the new instance.  <span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.35.4" class="relref">Section 18.35.4</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> replaces the prior instance's record at confirmation,
+not at EXCHANGE_ID, so nothing has been retained yet when the
+reply is sent.<a href="#section-5.1-8.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-5.1-8.3">
+            <p id="section-5.1-8.3.1">The server is in its own grace period and its stable storage
+lists this client owner as permitted to reclaim.<a href="#section-5.1-8.3.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-5.1-9">The flag names what the client can do rather than why, because
+the client acts the same way in all three cases.  The flag is a
+hint, given before confirmation.  It is not proof that any
+particular item of state was retained.  The authoritative answer
+for each item of state is the reply to the reclaim of that item.
+A gateway uses the hint to decide whether to run a front-side
+grace period at all.<a href="#section-5.1-9" class="pilcrow">¶</a></p>
+<p id="section-5.1-10">This extension does not add an attribute that advertises support
+for retention, although <span><a href="https://rfc-editor.org/rfc/rfc8178#section-6" class="relref">Section 6</a> of [<a href="#RFC8178" class="cite xref">RFC8178</a>]</span> offers that as a
+convenience and <span>[<a href="#RFC9754" class="cite xref">RFC9754</a>]</span> uses one for its OPEN flags.  An
+attribute is read per file system, with a filehandle in hand.
+Retention is a property of a client ID, and a client has to learn
+whether it is available at EXCHANGE_ID, before it has a session
+with which to read an attribute.<a href="#section-5.1-10" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="limits">
+<section id="section-5.2">
+        <h3 id="name-intervals-and-limits">
+<a href="#section-5.2" class="section-number selfRef">5.2. </a><a href="#name-intervals-and-limits" class="section-name selfRef">Intervals and Limits</a>
+        </h3>
+<p id="section-5.2-1">Retained state blocks other clients, so a server bounds how long
+it enforces that state.  Two intervals are bounded separately.<a href="#section-5.2-1" class="pilcrow">¶</a></p>
+<p id="section-5.2-2">The absence interval runs from expiry of the old instance's lease
 until a new instance is confirmed.  A server <span class="bcp14">MUST</span> bound the
 absence interval with an absence limit, a local policy value.
 Within the absence limit, a retaining client that is partitioned
 rather than restarted, and that returns with the same verifier,
 resumes with its state intact.  For such a client the absence
-limit acts as a longer lease.<a href="#section-5.1-2" class="pilcrow">¶</a></p>
-<p id="section-5.1-3">The reclaim interval runs from confirmation of the new instance
+limit acts as a longer lease.<a href="#section-5.2-2" class="pilcrow">¶</a></p>
+<p id="section-5.2-3">The reclaim interval runs from confirmation of the new instance
 until that instance sends RECLAIM_COMPLETE.  A server <span class="bcp14">MUST</span> bound
 the reclaim interval with a reclaim cap, a local policy value.
 Within the reclaim cap, the new instance's lease renewals keep the
@@ -1603,17 +1694,17 @@ already reclaimed is ordinary state of a live client, and the
 reclaim cap does not apply to it.  Without a cap, a faulty client
 that returns, renews its lease, and never sends RECLAIM_COMPLETE
 would block other clients indefinitely with state nobody is going
-to reclaim.<a href="#section-5.1-3" class="pilcrow">¶</a></p>
-<p id="section-5.1-4">When either limit is reached, the retained state it governs <span class="bcp14">MUST</span>
+to reclaim.<a href="#section-5.2-3" class="pilcrow">¶</a></p>
+<p id="section-5.2-4">When either limit is reached, the retained state it governs <span class="bcp14">MUST</span>
 stop blocking conflicting requests.  The server need not destroy
 the state at that moment.  The server <span class="bcp14">MAY</span> keep the state as
 <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> allows for expired state and revoke
 it when the first conflicting request arrives.  A reclaim that
 finds the state still in place succeeds, and does so safely,
-because nothing that conflicts was granted in the meantime.<a href="#section-5.1-4" class="pilcrow">¶</a></p>
-<p id="section-5.1-5">Neither limit is advertised to the client.  A client needs to
+because nothing that conflicts was granted in the meantime.<a href="#section-5.2-4" class="pilcrow">¶</a></p>
+<p id="section-5.2-5">Neither limit is advertised to the client.  A client needs to
 know only whether reclaims can succeed, which the EXCHANGE_ID
-reply tells it, and the reply to each reclaim is authoritative.<a href="#section-5.1-5" class="pilcrow">¶</a></p>
+reply tells it, and the reply to each reclaim is authoritative.<a href="#section-5.2-5" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -1634,7 +1725,7 @@ reply tells it, and the reply to each reclaim is authoritative.<a href="#section
 <p id="section-7-1">TODO Backend Server Behavior<a href="#section-7-1" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="xdr-description">
+<div id="xdr">
 <section id="section-8">
       <h2 id="name-xdr-description">
 <a href="#section-8" class="section-number selfRef">8. </a><a href="#name-xdr-description" class="section-name selfRef">XDR Description</a>

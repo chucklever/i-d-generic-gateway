@@ -78,7 +78,8 @@ Table of Contents
    3.  Terminology
    4.  Problem Summary
    5.  Protocol Extension
-     5.1.  Intervals and Limits
+     5.1.  Capability Negotiation
+     5.2.  Intervals and Limits
    6.  Gateway Server Behavior
    7.  Backend Server Behavior
    8.  XDR Description
@@ -357,7 +358,85 @@ Table of Contents
    run a front-side grace period at all.  It is not proof that any
    particular item of state was retained.
 
-5.1.  Intervals and Limits
+5.1.  Capability Negotiation
+
+   This extension defines two flags in the EXCHANGE_ID flag word, using
+   bits that Section 18.35.1 of [RFC8881] leaves unassigned.  Section 8
+   gives their values.
+
+   EXCHGID4_FLAG_RETAIN_STATE:  A client sets this flag in eia_flags to
+      request that the server retain the state of the client owner
+      across a restart.  A server sets this flag in eir_flags when it
+      will do so.  A client whose client ID was established by an
+      EXCHANGE_ID in which both the request and the reply carried this
+      flag is a retaining client.
+
+   EXCHGID4_FLAG_RECLAIMABLE_R:  A server sets this flag in eir_flags
+      when reclaim-type requests from this client owner can succeed once
+      the new client ID is confirmed.  A client MUST NOT set this flag
+      in eia_flags.
+
+   A server MUST NOT set either flag in eir_flags unless the request set
+   EXCHGID4_FLAG_RETAIN_STATE.  The request flag is how the server
+   knows, before it sends an extended reply, that the client is aware of
+   the extension (Section 6 of [RFC8178]).
+
+   A server that does not implement this extension rejects an
+   EXCHANGE_ID that sets EXCHGID4_FLAG_RETAIN_STATE with NFS4ERR_INVAL,
+   as Section 18.35.3 of [RFC8881] requires for an unassigned flag bit.
+   A client that receives NFS4ERR_INVAL MUST retry the EXCHANGE_ID
+   without the flag.  If the retry succeeds, the client knows that the
+   flag was the cause of the error and that the server does not support
+   retention.  The retry is necessary because EXCHANGE_ID returns
+   NFS4ERR_INVAL for other reasons as well (Section 4.4.3 of [RFC8178]).
+
+   Whether to retain state for a client owner is a server policy
+   decision.  A server that implements this extension MAY decline the
+   request.  A server that declines clears EXCHGID4_FLAG_RETAIN_STATE in
+   eir_flags and treats the client owner as [RFC8881] specifies.  Any
+   client that becomes a retaining client can hold opens and locks past
+   lease expiry for the whole absence limit, so a server SHOULD restrict
+   retention to principals that are authorized to act as gateways.  A
+   server SHOULD require that a retaining client use the SP4_MACH_CRED
+   state protection mode, so that only the holder of the client's
+   machine credential can establish the next instance of that client
+   owner and reclaim its state.  Section 9 discusses both points.
+
+   A server records that a client owner is a retaining client along with
+   the rest of the client owner's record, so that the server knows at
+   lease expiry how to treat the state of that client owner.
+
+   A server sets EXCHGID4_FLAG_RECLAIMABLE_R in each of three cases:
+
+   *  The server holds retained state from a prior instance of this
+      client owner whose lease has expired.
+
+   *  The server holds state of a prior instance of this client owner
+      whose lease has not expired, and will retain that state when
+      CREATE_SESSION confirms the new instance.  Section 18.35.4 of
+      [RFC8881] replaces the prior instance's record at confirmation,
+      not at EXCHANGE_ID, so nothing has been retained yet when the
+      reply is sent.
+
+   *  The server is in its own grace period and its stable storage lists
+      this client owner as permitted to reclaim.
+
+   The flag names what the client can do rather than why, because the
+   client acts the same way in all three cases.  The flag is a hint,
+   given before confirmation.  It is not proof that any particular item
+   of state was retained.  The authoritative answer for each item of
+   state is the reply to the reclaim of that item.  A gateway uses the
+   hint to decide whether to run a front-side grace period at all.
+
+   This extension does not add an attribute that advertises support for
+   retention, although Section 6 of [RFC8178] offers that as a
+   convenience and [RFC9754] uses one for its OPEN flags.  An attribute
+   is read per file system, with a filehandle in hand.  Retention is a
+   property of a client ID, and a client has to learn whether it is
+   available at EXCHANGE_ID, before it has a session with which to read
+   an attribute.
+
+5.2.  Intervals and Limits
 
    Retained state blocks other clients, so a server bounds how long it
    enforces that state.  Two intervals are bounded separately.
