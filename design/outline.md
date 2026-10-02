@@ -1,7 +1,8 @@
 # Outline: State Retention Across Client Restart for NFSv4.2
 
 Working outline for a standalone NFSv4.2 extension (RFC 8178).
-Intended status: Standards Track.  Draft name: TBD.
+Intended status: Standards Track.
+Draft name: draft-cel-nfsv4-state-retention.
 
 Decisions cited as D1 through D12 are in `design.md`.  The
 problem itself is described in `problem-statement.md`; this
