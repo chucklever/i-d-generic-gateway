@@ -11,10 +11,10 @@
 itself an NFS mount of a backend server.  When the gateway
 restarts, the backend server releases the file open and lock state
 the gateway established there, even though the gateway's clients
-are still running and will attempt to recover that state.  This
-document extends NFSv4.2 so that a server can retain the state of
-a client that has restarted and permit the new instance of that
-client to reclaim it. 
+are still running and will attempt to reclaim the file open and
+lock state they hold.  This document extends NFSv4.2 so that a
+server can retain the state of a client that has restarted and
+permit the new instance of that client to reclaim that state. 
     " name="description">
 <meta content="xml2rfc 3.34.1" name="generator">
 <meta content="NFSv4.2" name="keyword">
@@ -1089,10 +1089,10 @@ svg {
 itself an NFS mount of a backend server.  When the gateway
 restarts, the backend server releases the file open and lock state
 the gateway established there, even though the gateway's clients
-are still running and will attempt to recover that state.  This
-document extends NFSv4.2 so that a server can retain the state of
-a client that has restarted and permit the new instance of that
-client to reclaim it.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+are still running and will attempt to reclaim the file open and
+lock state they hold.  This document extends NFSv4.2 so that a
+server can retain the state of a client that has restarted and
+permit the new instance of that client to reclaim that state.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 </section>
 <section class="note rfcEditorRemove" id="section-note.1">
       <h2 id="name-about-this-document">
@@ -1228,29 +1228,32 @@ client ID and lease.<a href="#section-1-1" class="pilcrow">¶</a></p>
 When a client presents a known client owner with a new verifier in
 EXCHANGE_ID and then confirms the new client ID, the server
 releases the opens and byte-range locks that the previous instance
-held (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.1" class="relref">Section 8.4.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>, <span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.35.4" class="relref">Section 18.35.4</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  For most clients this is the correct outcome.  The
-applications that held the state restarted along with the client,
-and nothing remains that could reclaim it.<a href="#section-1-2" class="pilcrow">¶</a></p>
+held (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.1" class="relref">Section 8.4.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>, <span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.35.4" class="relref">Section 18.35.4</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  For most clients, releasing that state is the correct
+outcome.  The applications that held the state restarted along
+with the client, and nothing remains that could reclaim the state.<a href="#section-1-2" class="pilcrow">¶</a></p>
 <p id="section-1-3">A gateway restart is different.  The gateway's clients did not
-restart.  They observe only that their server was unreachable for
-a time, and when it returns they begin state recovery: NFSv4
-clients reclaim their opens and locks during the gateway's grace
-period, and NFSv3 clients reclaim their NLM locks when the
-gateway's status monitor announces the restart.  Each of those
-reclaims can succeed only if the gateway can re-establish the
-corresponding state on the backend.  The backend, however, has
-already released that state, and it accepts reclaim-type requests
-only during its own grace period, which it did not enter because
-it did not restart (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  The gateway
-has no way to restore its clients' state, and in the interval
-since the restart the backend may have granted conflicting opens
-or locks to other clients.<a href="#section-1-3" class="pilcrow">¶</a></p>
+restart.  The gateway's clients observe only that the gateway was
+unreachable for a time, and when the gateway returns they begin
+state recovery: NFSv4 clients of the gateway reclaim their opens
+and locks during the gateway's grace period, and NFSv3 clients of
+the gateway reclaim their NLM locks when the gateway's status
+monitor announces the restart.  Each of those reclaims can succeed
+only if the gateway can re-establish the corresponding state on
+the backend.  The backend, however, has already released that
+state.  The backend accepts reclaim-type requests only during the
+backend's own grace period, and the backend did not restart, so
+no grace period is in effect (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  The
+gateway has no way to restore the state of the gateway's clients,
+and in the interval since the gateway restarted the backend may
+have granted conflicting opens or locks to clients that access the
+backend directly.<a href="#section-1-3" class="pilcrow">¶</a></p>
 <p id="section-1-4">NFSv4.1 already retains one kind of state across a client restart.
 A server that supports CLAIM_DELEGATE_PREV keeps a restarted
 client's delegations for at least a lease period so that the new
 instance of the client can reclaim them (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-10.2.1" class="relref">Section 10.2.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  This document applies the same idea to opens and
-byte-range locks.  It defines client-restart state retention: a
-server that supports it and a client that has requested it agree
+byte-range locks.  This document defines client-restart state
+retention: a server that supports retention and a client that has
+requested retention agree
 that the client's opens and locks survive a restart of the client,
 and that the new instance of the client may reclaim them outside
 the server's grace period.  The client requests retention when it
@@ -1270,9 +1273,9 @@ motivating case and develops the gateway's behavior in detail.<a href="#section-
 <p id="section-1-6">This document specifies the mechanism as an extension to NFSv4.2
 under the process described in <span>[<a href="#RFC8178" class="cite xref">RFC8178</a>]</span>, in the hope that it
 can be deployed without a new NFSv4 minor version.  The behavior
-it introduces applies only to client IDs that have negotiated it.
-Servers and clients that do not implement the extension are
-unaffected.<a href="#section-1-6" class="pilcrow">¶</a></p>
+the extension introduces applies only to client IDs that have
+negotiated the extension.  Servers and clients that do not
+implement the extension are unaffected.<a href="#section-1-6" class="pilcrow">¶</a></p>
 <p id="section-1-7">This document is distinct from
 <span>[<a href="#I-D.haynes-nfsv4-flexfiles-v2-proxy-server" class="cite xref">I-D.haynes-nfsv4-flexfiles-v2-proxy-server</a>]</span>, which describes a
 proxy that the backend's metadata server names in pNFS layouts.
@@ -1307,7 +1310,68 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
       <h2 id="name-problem-summary">
 <a href="#section-4" class="section-number selfRef">4. </a><a href="#name-problem-summary" class="section-name selfRef">Problem Summary</a>
       </h2>
-<p id="section-4-1">TODO Problem Summary<a href="#section-4-1" class="pilcrow">¶</a></p>
+<p id="section-4-1"><a href="#fig-deployment" class="auto internal xref">Figure 1</a> shows the deployment this document addresses.
+The gateway's clients may use NFSv3 with NLM and NSM, or any
+NFSv4 minor version.  The gateway accesses the backend as an
+NFSv4.2 client, and all of its clients share that one client ID.
+Direct clients, and other gateways, may access the same files,
+and the backend is the only party that can arbitrate among all of
+the parties that hold state there.<a href="#section-4-1" class="pilcrow">¶</a></p>
+<span id="name-deployment-model"></span><div id="fig-deployment">
+<figure id="figure-1">
+        <div class="alignLeft art-text artwork" id="section-4-2.1">
+<pre>
+  gateway clients          gateway            backend
+  +-----------+        +-------------+     +-----------+
+  | NFSv3/NLM |-------&gt;| NFS server  |     |           |
+  | NFSv4.x   |        |     |       |     |    NFS    |
+  +-----------+        | NFS client  |----&gt;|   server  |
+                       +-------------+     |           |
+  direct clients -------------------------&gt;|           |
+                                           +-----------+
+</pre>
+</div>
+<figcaption><a href="#figure-1" class="selfRef">Figure 1</a>:
+<a href="#name-deployment-model" class="selfRef">Deployment model</a>
+        </figcaption></figure>
+</div>
+<p id="section-4-3">NFSv4 recovery (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4" class="relref">Section 8.4</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>) assumes two parties.
+State belongs to a client instance and is kept alive by its lease.
+When the server restarts, it offers a grace period in which
+clients reclaim what they held.  When the client restarts, the
+server discards the old instance's state, because the
+applications that held it are gone.  A gateway breaks that last
+assumption.  Its back-side client instance restarts, but the
+applications that hold the state are on the gateway's clients,
+which have not restarted and will reclaim.  The backend, not in a
+grace period, refuses the reclaims the gateway forwards, and in
+the meantime may have granted conflicting state to direct
+clients.<a href="#section-4-3" class="pilcrow">¶</a></p>
+<p id="section-4-4">A gateway restart is the only failure that the existing protocol
+cannot express, and the extension in this document exists for
+that failure.  Three related failures need gateway and backend
+behavior but no new protocol elements, and later sections describe
+that behavior.  When the backend restarts alone, the gateway
+reclaims the state the gateway holds on the backend and shields
+the gateway's clients from the backend's grace period.  When both
+the gateway and the backend restart, the gateway forwards the
+reclaims of the gateway's clients into the backend's grace period
+on a best-effort basis, since the two grace periods are not
+coordinated.  When a partition outlasts the gateway's lease on the
+backend, the backend may revoke the gateway's state, and the
+gateway reports to the gateway's clients a loss that those clients
+did not cause.<a href="#section-4-4" class="pilcrow">¶</a></p>
+<p id="section-4-5">The extension described in this document does not retain
+delegations.  A delegation that a gateway grants to one of its
+clients can survive a gateway
+restart only if the backend guarantees that no conflicting access
+occurred in the interim, which requires a back-side delegation
+retained under CLAIM_DELEGATE_PREV (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-10.2.1" class="relref">Section 10.2.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>).  A future version of this document, or a separate
+one, may permit a gateway to grant a front-side delegation on
+that condition.  Also out of scope are pNFS layouts on either
+side of the gateway, a back side other than NFSv4.2, failover of
+a gateway's state to a different gateway host, and a gateway
+whose backend is itself a gateway.<a href="#section-4-5" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="overview">
