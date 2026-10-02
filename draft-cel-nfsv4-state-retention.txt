@@ -628,7 +628,48 @@ Table of Contents
 
 5.5.  Operations Before RECLAIM_COMPLETE
 
-   TODO Operations Before RECLAIM_COMPLETE
+   Section 18.51.3 of [RFC8881] requires a client with a new client ID
+   to send a global RECLAIM_COMPLETE before its first non-reclaim
+   locking operation, and a server that receives a non-reclaim locking
+   operation before RECLAIM_COMPLETE returns NFS4ERR_GRACE.  A new
+   instance of a retaining client cannot send RECLAIM_COMPLETE until it
+   knows that no more reclaims will arrive.  For a gateway, that is the
+   end of its front-side grace period, which can be a full lease period
+   after the gateway returns.
+
+   Little of what a gateway does in that interval needs a non-reclaim
+   locking operation.  Lock reclaims do not need a fresh open, because
+   each lock is reclaimed under its reclaimed open (Section 5.4).  New
+   locking requests from front-side clients do not need one either,
+   because the gateway's own grace period holds them off.  What remains
+   is a gateway that opens a file in order to serve NFSv3 READ and WRITE
+   requests, which NLM does not gate on recovery and which a gateway
+   serves throughout its own grace period.
+
+   For a client ID established with EXCHGID4_FLAG_RETAIN_STATE, a server
+   MUST accept a non-reclaim OPEN before the client's RECLAIM_COMPLETE.
+   The server checks that OPEN against retained state as it checks any
+   OPEN against existing state: if the request conflicts with a retained
+   open's share deny mode, the server returns NFS4ERR_SHARE_DENIED.  A
+   non-reclaim LOCK before RECLAIM_COMPLETE continues to fail with
+   NFS4ERR_GRACE, as [RFC8881] specifies.
+
+   This requirement differs from Section 18.51.3 of [RFC8881] and from
+   the corresponding statement in Section 8.4.2.1 of [RFC8881].  It is
+   part of the meaning of EXCHGID4_FLAG_RETAIN_STATE and is in effect
+   only for a client ID established with that flag.  It does not change
+   the behavior [RFC8881] requires of a server toward any other client.
+   The exception in Section 8.4.2.1 of [RFC8881] applies to a server in
+   its own grace period, which is not the case here.  The safety
+   argument is the same one, though: the server holds the complete
+   retained state of the client owner, so it can determine that granting
+   the OPEN cannot conflict with a reclaim that arrives later.
+
+   A gateway is not obliged to use this permission.  A gateway MAY
+   instead serve NFSv3 READ and WRITE requests with a special stateid
+   (Section 8.2.3 of [RFC8881]) until it has sent RECLAIM_COMPLETE.
+   This extension does not dictate how a gateway's back-side client
+   performs I/O.
 
 5.6.  Completing Reclaim
 

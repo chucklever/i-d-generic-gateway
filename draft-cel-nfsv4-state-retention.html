@@ -1891,7 +1891,47 @@ the server and says nothing about the gateway's clients.
         <h3 id="name-operations-before-reclaim_c">
 <a href="#section-5.5" class="section-number selfRef">5.5. </a><a href="#name-operations-before-reclaim_c" class="section-name selfRef">Operations Before RECLAIM_COMPLETE</a>
         </h3>
-<p id="section-5.5-1">TODO Operations Before RECLAIM_COMPLETE<a href="#section-5.5-1" class="pilcrow">¶</a></p>
+<p id="section-5.5-1"><span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.51.3" class="relref">Section 18.51.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> requires a client with a new client
+ID to send a global RECLAIM_COMPLETE before its first non-reclaim
+locking operation, and a server that receives a non-reclaim
+locking operation before RECLAIM_COMPLETE returns NFS4ERR_GRACE.
+A new instance of a retaining client cannot send RECLAIM_COMPLETE
+until it knows that no more reclaims will arrive.  For a gateway,
+that is the end of its front-side grace period, which can be a
+full lease period after the gateway returns.<a href="#section-5.5-1" class="pilcrow">¶</a></p>
+<p id="section-5.5-2">Little of what a gateway does in that interval needs a non-reclaim
+locking operation.  Lock reclaims do not need a fresh open,
+because each lock is reclaimed under its reclaimed open
+(<a href="#reclaim" class="auto internal xref">Section 5.4</a>).  New locking requests from front-side clients do
+not need one either, because the gateway's own grace period holds
+them off.  What remains is a gateway that opens a file in order to
+serve NFSv3 READ and WRITE requests, which NLM does not gate on
+recovery and which a gateway serves throughout its own grace
+period.<a href="#section-5.5-2" class="pilcrow">¶</a></p>
+<p id="section-5.5-3">For a client ID established with EXCHGID4_FLAG_RETAIN_STATE, a
+server <span class="bcp14">MUST</span> accept a non-reclaim OPEN before the client's
+RECLAIM_COMPLETE.  The server checks that OPEN against retained
+state as it checks any OPEN against existing state: if the
+request conflicts with a retained open's share deny mode, the
+server returns NFS4ERR_SHARE_DENIED.  A non-reclaim LOCK before
+RECLAIM_COMPLETE continues to fail with NFS4ERR_GRACE, as
+<span>[<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> specifies.<a href="#section-5.5-3" class="pilcrow">¶</a></p>
+<p id="section-5.5-4">This requirement differs from <span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.51.3" class="relref">Section 18.51.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> and
+from the corresponding statement in <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.2.1" class="relref">Section 8.4.2.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>.  It is part of the meaning of
+EXCHGID4_FLAG_RETAIN_STATE and is in effect only for a client ID
+established with that flag.  It does not change the behavior
+<span>[<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> requires of a server toward any other client.  The
+exception in <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.2.1" class="relref">Section 8.4.2.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> applies to a server
+in its own grace period, which is not the case here.  The safety
+argument is the same one, though: the server holds the complete
+retained state of the client owner, so it can determine that
+granting the OPEN cannot conflict with a reclaim that arrives
+later.<a href="#section-5.5-4" class="pilcrow">¶</a></p>
+<p id="section-5.5-5">A gateway is not obliged to use this permission.  A gateway <span class="bcp14">MAY</span>
+instead serve NFSv3 READ and WRITE requests with a special
+stateid (<span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.2.3" class="relref">Section 8.2.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>) until it has sent
+RECLAIM_COMPLETE.  This extension does not dictate how a
+gateway's back-side client performs I/O.<a href="#section-5.5-5" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="complete">
