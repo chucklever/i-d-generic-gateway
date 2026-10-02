@@ -1553,7 +1553,8 @@ the deny mode binds front-side clients only.<a href="#section-3-2.38.1" class="p
 <p id="section-4-1"><a href="#fig-deployment" class="auto internal xref">Figure 1</a> shows the deployment this document addresses.
 The gateway's clients may use NFSv3 with NLM and NSM, or any
 NFSv4 minor version.  The gateway accesses the backend as an
-NFSv4.2 client, and all of its clients share that one client ID.
+NFSv4.2 client, and all of the gateway's front-side clients share
+that one client ID.
 Direct clients, and other gateways, may access the same files,
 and the backend is the only party that can arbitrate among all of
 the parties that hold state there.<a href="#section-4-1" class="pilcrow">¶</a></p>
@@ -1753,8 +1754,8 @@ for retention, although <span><a href="https://rfc-editor.org/rfc/rfc8178#sectio
 convenience and <span>[<a href="#RFC9754" class="cite xref">RFC9754</a>]</span> uses one for its OPEN flags.  An
 attribute is read per file system, with a filehandle in hand.
 Retention is a property of a client ID, and a client has to learn
-whether it is available at EXCHANGE_ID, before it has a session
-with which to read an attribute.<a href="#section-5.1-10" class="pilcrow">¶</a></p>
+whether retention is available at EXCHANGE_ID, before the client
+has a session with which to read an attribute.<a href="#section-5.1-10" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="retain">
@@ -1930,14 +1931,15 @@ retained state, because to do so it would have to remember what it
 revoked.<a href="#section-5.4-7" class="pilcrow">¶</a></p>
 <p id="section-5.4-8">Matching on owner strings makes owner continuity a requirement.
 The new instance <span class="bcp14">MUST</span> present the same open-owner and lock-owner
-strings that the prior instance used for the state it reclaims.
+strings that the prior instance used for the state the new
+instance reclaims.
 A gateway that lost its own record of which front-side client held
 what has, in the server's retained state, a record it can rely
 on: a reclaim succeeds only for an owner that held the state, so
 the gateway derives owner strings deterministically from
-front-side identity, as <a href="#owners" class="auto internal xref">Section 6.2</a> specifies.  That includes the
-open-owner of an open the gateway created only to carry an NLM
-client's locks.<a href="#section-5.4-8" class="pilcrow">¶</a></p>
+front-side identity, as <a href="#owners" class="auto internal xref">Section 6.2</a> specifies.  The derived owner
+strings include the open-owner of an open the gateway created only
+to carry an NLM client's locks.<a href="#section-5.4-8" class="pilcrow">¶</a></p>
 <p id="section-5.4-9">Owner matching is a record, not authentication.  The server sees
 opaque strings and cannot tell which front-side client a reclaim
 is for, so it honors a reclaim under the right owner string
@@ -2149,10 +2151,11 @@ gateway's.  <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.2.1" c
 may also terminate the grace period before all clients have done
 a global RECLAIM_COMPLETE".  A gateway that returns after the
 server's grace period has ended, or whose front-side reclaims are
-still arriving when it ends, cannot recover the remainder.  To
-make that outcome rare, a server <span class="bcp14">SHOULD</span> record in stable storage
-that a client owner is a retaining client, and <span class="bcp14">SHOULD</span> hold its
-grace period open until that client owner has sent
+still arriving when the server's grace period ends, cannot
+recover the remainder.  To make that outcome rare, a server <span class="bcp14">SHOULD</span>
+record in stable storage that a client owner is a retaining
+client, and <span class="bcp14">SHOULD</span> hold the server's grace period open until that
+client owner has sent
 RECLAIM_COMPLETE, bounded by the absence limit while the client
 has not returned and by the reclaim cap once it has.
 <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.2.1" class="relref">Section 8.4.2.1</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> already permits a grace period
@@ -2238,9 +2241,10 @@ nonetheless changed retries the reclaim without deny bits and
 treats the result as local-only.<a href="#section-6.1-6" class="pilcrow">¶</a></p>
 <p id="section-6.1-7">Pass-through requires one back-side open-owner per front-side
 owner (<a href="#owners" class="auto internal xref">Section 6.2</a>).  A deny mode conflicts with opens by other
-open-owners, including other owners of the same client, so with
-that mapping the backend arbitrates deny modes among front-side
-clients as well as against direct clients.  A gateway that
+open-owners, including other open-owners under the same client
+ID, so with that mapping the backend arbitrates deny modes among
+the gateway's front-side clients as well as against direct
+clients.  A gateway that
 aggregates many front-side owners under one back-side open-owner
 is local-only for conflicts among its own clients, whatever bits
 it sends, and after a restart it cannot rely on owner matching to
@@ -2424,8 +2428,9 @@ front-side lock reclaim to a back-side LOCK with the reclaim field
 set under the reclaimed open, as for NLM.  Share deny modes
 survive the restart if the gateway passed them through.<a href="#section-6.6-1" class="pilcrow">¶</a></p>
 <p id="section-6.6-2">The gateway sends the back-side RECLAIM_COMPLETE when every
-front-side client in its record of clients permitted to reclaim
-has sent its own RECLAIM_COMPLETE, or when the front-side grace
+front-side client in the gateway's record of clients permitted to
+reclaim has sent its own RECLAIM_COMPLETE, or when the front-side
+grace
 timer ends, whichever comes first.  NFSv4.0 clients have no
 RECLAIM_COMPLETE, so for a gateway that serves them the timer
 governs.<a href="#section-6.6-2" class="pilcrow">¶</a></p>
@@ -2457,7 +2462,8 @@ timestamps (<span><a href="https://rfc-editor.org/rfc/rfc9754#section-5" class="
 file's access and modify times until it returns the delegation,
 and a restart loses the values only the gateway held.  Access
 times for reads the gateway served from its cache are lost.
-Modify times the gateway reported to its clients for data it had
+Modify times the gateway reported to front-side clients for data
+the gateway had
 already written may differ from the backend's own modify time for
 those writes, so that after the restart front-side clients see
 the modify time change with no other writer, and an NFSv3 client
@@ -2511,7 +2517,7 @@ restart, establishes a new client ID, and reclaims the derived
 state it has already recovered as any client does.  Front-side
 reclaims still arriving are forwarded as ordinary reclaims.  The
 gateway sends RECLAIM_COMPLETE to the new backend instance when
-its front-side grace period ends.  The same safety rule decides
+the gateway's front-side grace period ends.  The same safety rule decides
 each reclaim.<a href="#section-6.7-3" class="pilcrow">¶</a></p>
 </section>
 </div>
@@ -2602,13 +2608,15 @@ client owner.  Administrative release has the effect of a limit
 reached followed by immediate release (<a href="#limits" class="auto internal xref">Section 5.3</a>), and the server
 makes the stable-storage record of <a href="#retain" class="auto internal xref">Section 5.2</a> at that point.<a href="#section-7.3-1" class="pilcrow">¶</a></p>
 <p id="section-7.3-2">What the gateway's front-side clients then see depends on whether
-their state had been reclaimed.  For state not yet reclaimed, the
+the gateway had already reclaimed the corresponding derived state.
+For derived state not yet reclaimed, the
 gateway's later reclaim is refused and the gateway denies the
 front-side reclaim, which both NFSv4 and NLM can express.  For
 state the new instance had already reclaimed, administrative
-release is ordinary revocation of a live client's state, which the
-gateway reports to NFSv4 clients as <a href="#lost" class="auto internal xref">Section 6.8</a> describes and cannot
-report to NLM clients at all.<a href="#section-7.3-2" class="pilcrow">¶</a></p>
+release is ordinary revocation of the gateway's own live state at
+the backend, which the gateway reports to NFSv4 front-side clients
+as <a href="#lost" class="auto internal xref">Section 6.8</a> describes and cannot report to NLM front-side clients
+at all.<a href="#section-7.3-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="backend-stable">
@@ -3093,7 +3101,7 @@ still retained.<a href="#appendix-A.2-1.6.1" class="pilcrow">¶</a></p>
 <a href="#appendix-A.3" class="section-number selfRef">A.3. </a><a href="#name-gateway-restart-with-an-nfs" class="section-name selfRef">Gateway Restart with an NFSv4 Client</a>
         </h3>
 <p id="appendix-A.3-1">An NFSv4 front-side client differs from the NLM sequence in these
-ways.  The client learns of the gateway's restart from
+ways.  The front-side client learns of the gateway's restart from
 NFS4ERR_BADSESSION or NFS4ERR_STALE_CLIENTID rather than from
 SM_NOTIFY, and the gateway relies on its ordinary NFSv4 server
 stable storage, the list of clients permitted to reclaim.  A
