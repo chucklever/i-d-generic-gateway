@@ -1981,7 +1981,63 @@ clear, sends RECLAIM_COMPLETE at once, as <span><a href="https://rfc-editor.org/
         <h3 id="name-errors">
 <a href="#section-5.7" class="section-number selfRef">5.7. </a><a href="#name-errors" class="section-name selfRef">Errors</a>
         </h3>
-<p id="section-5.7-1">TODO Errors<a href="#section-5.7-1" class="pilcrow">¶</a></p>
+<p id="section-5.7-1">This extension defines no new error codes.  The following existing
+codes of <span>[<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> are returned in circumstances that this
+extension introduces.  Each is specified in the subsection that
+describes the circumstance; this list collects them.<a href="#section-5.7-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-5.7-2">
+          <dt id="section-5.7-2.1">NFS4ERR_INVAL:</dt>
+          <dd style="margin-left: 1.5em" id="section-5.7-2.2">
+            <p id="section-5.7-2.2.1">Returned by a server that does not implement this extension to
+an EXCHANGE_ID that sets EXCHGID4_FLAG_RETAIN_STATE
+(<a href="#negotiate" class="auto internal xref">Section 5.1</a>).<a href="#section-5.7-2.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-5.7-2.3">NFS4ERR_SHARE_DENIED, NFS4ERR_DENIED:</dt>
+          <dd style="margin-left: 1.5em" id="section-5.7-2.4">
+            <p id="section-5.7-2.4.1">Returned to a request from any client that conflicts with a
+retained open or a retained byte-range lock, respectively, while
+the retained state is enforced (<a href="#retain" class="auto internal xref">Section 5.2</a>).  These are the
+same results the requester would see had the retaining client
+not restarted, and they are returned in place of the yield to a
+conflicting request that <span><a href="https://rfc-editor.org/rfc/rfc8881#section-8.4.3" class="relref">Section 8.4.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span> otherwise
+requires of expired state.  NFS4ERR_SHARE_DENIED is also
+returned to a non-reclaim OPEN from the new instance itself when
+that OPEN conflicts with retained state (<a href="#before-complete" class="auto internal xref">Section 5.5</a>).<a href="#section-5.7-2.4.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-5.7-2.5">NFS4ERR_GRACE:</dt>
+          <dd style="margin-left: 1.5em" id="section-5.7-2.6">
+            <p id="section-5.7-2.6.1">Returned to a non-reclaim LOCK from a new instance before it
+sends RECLAIM_COMPLETE, unchanged from <span><a href="https://rfc-editor.org/rfc/rfc8881#section-18.51.3" class="relref">Section 18.51.3</a> of [<a href="#RFC8881" class="cite xref">RFC8881</a>]</span>.  Not returned to a non-reclaim OPEN from a retaining
+client in that interval (<a href="#before-complete" class="auto internal xref">Section 5.5</a>), and not returned
+to another client whose request conflicts with retained state
+(<a href="#retain" class="auto internal xref">Section 5.2</a>).<a href="#section-5.7-2.6.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-5.7-2.7">NFS4ERR_RECLAIM_BAD:</dt>
+          <dd style="margin-left: 1.5em" id="section-5.7-2.8">
+            <p id="section-5.7-2.8.1">Returned to a reclaim-type request from a client owner for which
+the server holds retained state when no retained state matches
+the request (<a href="#reclaim" class="auto internal xref">Section 5.4</a>).<a href="#section-5.7-2.8.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-5.7-2.9">NFS4ERR_NO_GRACE:</dt>
+          <dd style="margin-left: 1.5em" id="section-5.7-2.10">
+            <p id="section-5.7-2.10.1">Returned to a reclaim-type request when the server is not in its
+grace period and holds no retained state for the client owner,
+whether because the state was never retained, was released at a
+limit or by administrative action, or was released by an earlier
+RECLAIM_COMPLETE (<a href="#reclaim" class="auto internal xref">Section 5.4</a>, <a href="#complete" class="auto internal xref">Section 5.6</a>).<a href="#section-5.7-2.10.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-5.7-3">A server does not return NFS4ERR_RECLAIM_CONFLICT on account of
+retained state.  State revoked for a conflicting request after a
+limit is no longer retained, and a reclaim for it receives
+NFS4ERR_RECLAIM_BAD or NFS4ERR_NO_GRACE as above.  To return
+NFS4ERR_RECLAIM_CONFLICT instead, the server would have to
+remember what it had revoked (<a href="#reclaim" class="auto internal xref">Section 5.4</a>).<a href="#section-5.7-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="grace">
