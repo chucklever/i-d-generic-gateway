@@ -432,6 +432,82 @@ Retention is a property of a client ID, and a client has to learn
 whether retention is available at EXCHANGE_ID, before the client
 has a session with which to read an attribute.
 
+## Retaining State {#retain}
+
+{{RFC8881}} has a server release a client's state in two
+situations: when a new instance of the client is confirmed
+({{Section 8.4.1 of RFC8881}}), and when the client's lease
+expires and the server chooses not to keep the state as courtesy
+locks ({{Section 8.4.3 of RFC8881}}).  For a retaining client,
+a server MUST NOT release the opens and byte-range locks of the
+client in either situation.  Instead, the server retains them.
+Retention at the confirmation of a new instance happens when
+CREATE_SESSION confirms the new client ID, which is the point at
+which {{Section 18.35.4 of RFC8881}} has the server replace the
+prior instance's record.  Nothing changes at EXCHANGE_ID.
+
+The state that a server retains consists of:
+
+- the client's opens, with the share access and share deny modes
+  the server holds for each of them; and
+
+- the client's byte-range locks.
+
+The server does not retain the prior instance's sessions, its
+client ID, or its stateids.  A new instance obtains new stateids
+for the state it reclaims.  The server does not retain layouts.
+Delegations are handled as {{RFC8881}} specifies, and in
+particular a server that supports CLAIM_DELEGATE_PREV handles them
+as {{Section 10.2.1 of RFC8881}} describes.  This extension does
+not change delegation handling.
+
+Retained state behaves as though the prior instance still held
+it.  A request from another client that conflicts with a retained
+open fails with NFS4ERR_SHARE_DENIED, and one that conflicts with
+a retained byte-range lock fails with NFS4ERR_DENIED.  These are
+the results the other client would have seen had the retaining
+client not restarted.  The server MUST NOT return a grace-period
+error for such a conflict.  This is a departure from
+{{Section 8.4.3 of RFC8881}}, which requires that the state of a
+client whose lease has expired yield to a conflicting request.
+For a retaining client, that requirement is suspended until one
+of the limits in {{limits}} is reached, after which it applies
+again.
+
+{{Section 8.4.3 of RFC8881}} also has a server record in stable
+storage that a client's lease expired, so that the server can
+reject the client's reclaims after a server restart with
+NFS4ERR_NO_GRACE.  The reason for that record is that another
+client could have acquired a conflicting lock in the interim.  For
+a retaining client the reason does not hold while the state is
+retained, because no conflicting lock is granted.  A server MUST
+NOT make that record at lease expiry for a retaining client.  The
+server makes the record when it releases or revokes retained
+state, whether at a limit, at the first conflicting request after
+a limit, or by administrative action.  {{grace}} describes the
+consequences for a server restart.
+
+Retained state accumulates across repeated restarts of the same
+client owner.  If a new instance is confirmed, reclaims some of the
+retained state, and then itself restarts before sending
+RECLAIM_COMPLETE, the server retains both the state that instance
+held and the remainder it never reclaimed.  A RECLAIM_COMPLETE
+from any later instance releases everything not yet reclaimed, as
+{{complete}} specifies.  Each item of retained state keeps the
+reclaim-cap clock started by the first confirmation after it was
+retained.  A later confirmation MUST NOT restart that clock.
+Without that rule, a client that restarts in a loop could block
+other clients without bound with state it never reclaims, since
+every confirmation would start the cap over.  State the client
+does reclaim after each restart is held legitimately each time,
+so a fresh clock for it, started when the next instance is
+confirmed, costs other clients nothing they were owed.
+
+A server is not required to preserve retained state across a
+restart of the server itself.  {{grace}} describes what happens
+when a server restarts during an absence interval or a reclaim
+interval.
+
 ## Intervals and Limits {#limits}
 
 Retained state blocks other clients, so a server bounds how long
@@ -467,6 +543,26 @@ because nothing that conflicts was granted in the meantime.
 Neither limit is advertised to the client.  A client needs to
 know only whether reclaims can succeed, which the EXCHANGE_ID
 reply tells it, and the reply to each reclaim is authoritative.
+
+## Reclaiming Outside the Grace Period {#reclaim}
+
+TODO Reclaiming Outside the Grace Period
+
+## Operations Before RECLAIM_COMPLETE {#before-complete}
+
+TODO Operations Before RECLAIM_COMPLETE
+
+## Completing Reclaim {#complete}
+
+TODO Completing Reclaim
+
+## Errors {#errors}
+
+TODO Errors
+
+## Interaction with the Server's Grace Period {#grace}
+
+TODO Interaction with the Server's Grace Period
 
 
 # Gateway Server Behavior
